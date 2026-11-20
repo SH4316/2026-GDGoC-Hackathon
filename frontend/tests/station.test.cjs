@@ -18,6 +18,10 @@ function worker(cv, map) {
   return rgba => {
     self.onmessage({ data: { type: 'frame', w: W, h: H, rgba: rgba.buffer } });
     assert.equal(reply.type, 'frame');
+    const c = map.camera.calibration;
+    const focal = Math.hypot(W, H) / (2 * Math.tan(35 * Math.PI / 180));
+    const expected = c ? [c.fx, c.fy, c.cx, c.cy] : [focal, focal, (W-1)/2, (H-1)/2];
+    assert.deepEqual(Array.from(reply.intrinsics), expected, 'saved JPEG intrinsics, also during tag loss');
     return reply.fix;
   };
 }
@@ -68,9 +72,15 @@ function scene(cv, floor, ids) {
   return pixels;
 }
 
-function checkFix(fix, eye, floor, direction) {
+function checkFix(fix, eye, floor, direction, principal = [(W-1)/2, (H-1)/2]) {
   assert.ok(fix?.arrow, 'visible route arrow');
   assert.ok(Math.hypot(...fix.position.map((x,i) => x-eye[i])) < .12, 'camera centre in measured metres');
+  const m = fix.cameraToWorld;
+  assert.deepEqual([m[3], m[7], m[11]], Array.from(fix.position));
+  const distanceToFloor = -m[11]/m[10];
+  const opticalAxisHit = [m[3] + distanceToFloor*m[2], m[7] + distanceToFloor*m[6]];
+  const expectedHit = floor(...principal);
+  assert.ok(Math.hypot(...opticalAxisHit.map((v,i) => v-expectedHit[i])) < .06, 'saved positive camera Z points into the scene');
   const tip = floor(...fix.arrow[4]), tail = floor(...fix.arrow[0]);
   assert.ok(tip[direction]-tail[direction] > .32, 'arrow points along the expected floor axis');
 }
@@ -97,5 +107,5 @@ test('floor localization, route turn, tag loss and reacquisition', async () => {
   const cal={width:W,height:H,fx:650,fy:685,cx:W/2+9,cy:H/2-7,distortion:[0,0,0,0,0]};
   const calibrated=worker(cv,{...station,camera:{calibration:cal}});
   const calibratedFloor=floorAt(eye,[0,.62,0],cal);
-  checkFix(calibrated(scene(cv,calibratedFloor,[[0,0],[1,1]])),eye,calibratedFloor,1);
+  checkFix(calibrated(scene(cv,calibratedFloor,[[0,0],[1,1]])),eye,calibratedFloor,1,[cal.cx,cal.cy]);
 });

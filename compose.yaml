@@ -1,7 +1,33 @@
 services:
+  collector:
+    build:
+      context: ./backend
+      target: development
+    user: "${COLLECTOR_UID:-1000}:${COLLECTOR_GID:-1000}"
+    restart: unless-stopped
+    environment:
+      API_PORT: "8081"
+      RECORDINGS_DIR: /data/recordings
+    volumes:
+      - ./backend/src:/app/backend/src:ro
+      - ./backend/reconstruct.cjs:/app/backend/reconstruct.cjs:ro
+      - ${RECORDINGS_DIR:-./data/recordings}:/data/recordings
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8081/api/recordings/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
   web:
     build: ./frontend
     restart: unless-stopped
+    volumes:
+      - ./frontend/public/station.json:/usr/share/nginx/html/station.json:ro
+      - ./frontend/public/ar:/usr/share/nginx/html/ar:ro
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      collector:
+        condition: service_healthy
     ports:
       - "127.0.0.1:${APP_PORT:-8080}:80"
     healthcheck:

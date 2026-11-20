@@ -41,7 +41,7 @@ function configure(map) {
   station = map;
 }
 
-function cameraMatrix(w, h, own) {
+function cameraIntrinsics(w, h) {
   const c = station.camera.calibration;
   let fx, fy, cx, cy;
   if (c) {
@@ -53,7 +53,7 @@ function cameraMatrix(w, h, own) {
     fx = fy = Math.hypot(w,h) / (2*Math.tan(station.camera.diagonalFovDeg*Math.PI/360));
     cx = (w-1)/2; cy = (h-1)/2;
   }
-  return own(lib.matFromArray(3, 3, lib.CV_64F, [fx,0,cx, 0,fy,cy, 0,0,1]));
+  return [fx, fy, cx, cy];
 }
 
 function visibleTags(frame, own) {
@@ -109,7 +109,7 @@ function arrowAt(position, tags, project, bounds) {
   return null;
 }
 
-function locate({ rgba, w, h, bounds = [0, 0, w, h] }) {
+function locate({ rgba, w, h, bounds = [0, 0, w, h] }, intrinsics) {
   const owned = [];
   const own = (m) => { owned.push(m); return m; };
   try {
@@ -117,7 +117,8 @@ function locate({ rgba, w, h, bounds = [0, 0, w, h] }) {
     image.data.set(new Uint8Array(rgba));
     let tags = visibleTags(image, own);
     if (!tags.length) return null;
-    const K = cameraMatrix(w, h, own);
+    const [fx, fy, cx, cy] = intrinsics;
+    const K = own(lib.matFromArray(3, 3, lib.CV_64F, [fx,0,cx, 0,fy,cy, 0,0,1]));
     const coefficients = station.camera.calibration?.distortion ?? [0,0,0,0,0];
     const dist = own(lib.matFromArray(coefficients.length, 1, lib.CV_64F, coefficients));
     const r = own(new lib.Mat()), t = own(new lib.Mat());
@@ -166,7 +167,13 @@ function locate({ rgba, w, h, bounds = [0, 0, w, h] }) {
       lib.projectPoints(obj, r, t, K, dist, uv);
       return outline.map((_,i) => [uv.data64F[i*2], uv.data64F[i*2+1]]);
     }
-    return { position, ids: tags.map(tag => tag.id), rmsPx, arrow: arrowAt(position, tags, project, bounds) };
+    const cameraToWorld = [
+      R[0], R[3], R[6], position[0],
+      R[1], R[4], R[7], position[1],
+      R[2], R[5], R[8], position[2],
+      0, 0, 0, 1,
+    ];
+    return { position, cameraToWorld, ids: tags.map(tag => tag.id), rmsPx, arrow: arrowAt(position, tags, project, bounds) };
   } finally {
     for (let i = owned.length-1; i >= 0; i--) owned[i].delete();
   }
@@ -194,7 +201,8 @@ self.onmessage = ({ data }) => {
     return;
   }
   try {
-    self.postMessage({ type: 'frame', fix: locate(data) });
+    const intrinsics = cameraIntrinsics(data.w, data.h);
+    self.postMessage({ type: 'frame', fix: locate(data, intrinsics), intrinsics });
   } catch (error) {
     if (!reportedFrameError) { console.warn('역사 AR:', String(error)); reportedFrameError = true; }
     self.postMessage({ type: 'frame', fix: null });

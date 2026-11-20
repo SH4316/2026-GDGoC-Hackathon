@@ -14,3 +14,53 @@ video, canvas {
   object-fit: cover;
   pointer-events: none;
 }
+
+body {
+  font-family: "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+  color: #f5f7f6;
+}
+
+.capture-bar {
+  position: fixed;
+  inset-inline: 12px;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  margin: 0 auto;
+  width: fit-content;
+  max-width: calc(100% - 24px);
+  box-sizing: border-box;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding: 7px 8px 7px 16px;
+  border: 1px solid #49504e;
+  border-radius: 16px;
+  background: rgb(19 23 22 / 94%);
+}
+
+.capture-readout { flex: 1; min-width: 82px; line-height: 1.35; }
+.capture-readout strong { display: flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 650; }
+.capture-readout small { display: block; margin-top: 2px; font-size: 12px; color: #c8d2ce; font-variant-numeric: tabular-nums; }
+.capture-readout i { flex: none; width: 7px; height: 7px; border-radius: 50%; background: #a8b5ae; }
+.capture-readout i[data-state="located"] { background: #50dfa3; }
+.capture-readout i[data-state="recording"] { background: #ff8070; }
+.capture-bar button, .capture-bar a {
+  box-sizing: border-box; min-height: 44px; font: inherit; font-size: 14px; font-weight: 600;
+  color: inherit; background: transparent; border: 0; cursor: pointer;
+}
+.capture-bar :is(button, a):focus-visible { outline: 3px solid #65d8ae; outline-offset: 2px; }
+.capture-bar button:disabled { opacity: .55; cursor: default; }
+.files { display: flex; align-items: center; gap: 6px; }
+.files a { display: inline-flex; align-items: center; text-underline-offset: 3px; }
+.capture-bar .capture-action {
+  display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 14px;
+  border-radius: 10px; background: #edf2ef; color: #121916; white-space: nowrap;
+}
+.capture-action span { width: 10px; height: 10px; border-radius: 50%; background: #b53328; }
+.capture-action[data-recording="true"] span { border-radius: 2px; }
+@media (max-width: 420px) {
+  .capture-bar { column-gap: 8px; }
+  .files { gap: 2px; }
+  .files :is(button, a) { font-size: 12px; }
+}

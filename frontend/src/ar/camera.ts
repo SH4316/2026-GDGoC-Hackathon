@@ -1,12 +1,18 @@
 import opencvUrl from '@techstark/opencv-js/dist/opencv.js?url';
 
-type Point = [number, number];
-type Fix = { position: [number, number, number]; ids: number[]; rmsPx: number; arrow: Point[] | null };
-type Reply = { type: 'ready' } | { type: 'error'; message: string } | { type: 'frame'; fix: Fix | null };
+import type { Fix, Intrinsics } from './recording';
+
+type Hooks = {
+  ready: (station: unknown) => void;
+  state: (state: string) => void;
+  frame: (canvas: HTMLCanvasElement, at: number, mediaTimeS: number, intrinsics: Intrinsics, fix: Fix | null) => void;
+  pause: () => void;
+};
+type Reply = { type: 'ready' } | { type: 'error'; message: string } | { type: 'frame'; fix: Fix | null; intrinsics?: Intrinsics };
 
 const STALE_MS = 350;
 
-export function openPassage(video: HTMLVideoElement, overlay: HTMLCanvasElement) {
+export function openPassage(video: HTMLVideoElement, overlay: HTMLCanvasElement, hooks: Hooks) {
   const lifetime = new AbortController();
   const capture = document.createElement('canvas');
   const pixels = capture.getContext('2d', { willReadFrequently: true })!;
@@ -32,6 +38,7 @@ export function openPassage(video: HTMLVideoElement, overlay: HTMLCanvasElement)
   }
 
   function stop() {
+    hooks.pause();
     generation++;
     opening = false;
     ready = false;
@@ -117,6 +124,7 @@ export function openPassage(video: HTMLVideoElement, overlay: HTMLCanvasElement)
     if (lifetime.signal.aborted || document.hidden || opening || stream) return;
     const token = ++generation;
     opening = true;
+    hooks.state('카메라 연결 중');
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
         throw new Error('카메라를 사용할 수 없습니다. 지원 브라우저에서 localhost 또는 HTTPS 주소로 접속하세요.');
@@ -138,16 +146,24 @@ export function openPassage(video: HTMLVideoElement, overlay: HTMLCanvasElement)
       worker = new Worker(base + 'ar/tracker.js');
       worker.onmessage = ({ data }: MessageEvent<Reply>) => {
         if (token !== generation) return;
-        if (data.type === 'ready') { ready = true; schedule(); }
-        else if (data.type === 'frame') { busy = false; paint(data.fix); }
-        else { console.error('역사 AR:', data.message); stop(); }
+        if (data.type === 'ready') { ready = true; hooks.ready(station); schedule(); }
+        else if (data.type === 'frame') {
+          busy = false;
+          if (data.intrinsics) hooks.frame(capture, frameAt, lastVideoTime, data.intrinsics, data.fix);
+          paint(data.fix);
+        }
+        else { console.error('역사 AR:', data.message); stop(); hooks.state('새로고침해 다시 연결하세요'); }
       };
       worker.onerror = (error) => {
-        if (token === generation) { console.error('역사 AR:', error.message); stop(); }
+        if (token === generation) { console.error('역사 AR:', error.message); stop(); hooks.state('새로고침해 다시 연결하세요'); }
       };
       worker.postMessage({ type: 'init', library: new URL(opencvUrl, location.href).href, station });
     } catch (error) {
-      if (token === generation) { console.warn('역사 AR:', error); stop(); }
+      if (token === generation) {
+        console.warn('역사 AR:', error); stop();
+        hooks.state(!window.isSecureContext ? '카메라는 HTTPS 또는 localhost에서 열어 주세요' :
+          error instanceof DOMException && error.name === 'NotAllowedError' ? '카메라를 허용하고 화면을 누르세요' : '후면 카메라를 확인하고 화면을 누르세요');
+      }
     } finally {
       if (token === generation) opening = false;
     }
