@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { SignReader } from './SignReader';
 import { openPassage, type TagReference } from './ar/camera';
 import { IndoorMinimap } from './ar/IndoorMinimap';
+import { LivePassageProgress } from './ar/PassageProgress';
 import { ArDebugControls, useArDebug } from './ar/ArDebugControls';
 import type { MinimapPose } from './ar/indoorTracking';
 import { FieldRecorder, idleView } from './ar/recording';
@@ -213,6 +214,11 @@ export function App() {
         <video ref={video} autoPlay playsInline muted disablePictureInPicture aria-label="후면 카메라" />
         <canvas ref={overlay} className="tag-overlay" aria-label="인식한 태그와 바닥 안내 화살표" />
         <canvas ref={modelCanvas} className="model-overlay" aria-label="태그 위 3D 모델" />
+        {view === 'ar' && available && !cameraError && !estimating && camera === '태그 탐색 중' && !nearDestination &&
+          <svg className="passage-viewfinder" viewBox="0 0 100 100" fill="none" aria-hidden="true">
+            <path d="M3 24V3h21m52 0h21v21m0 52v21H76m-52 0H3V76"
+              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>}
         {view === 'map' && <span className="preview-label">태그 인식 중</span>}
       </div>}
       {fullCamera && <div className="camera-controls">
@@ -223,6 +229,8 @@ export function App() {
           {trip && progress.station && <p role="status">{progress.step === trip.steps.length
             ? '도착지에 도착했습니다.' : '태그로 확인한 역 · ' + stationName(progress.station)}</p>}
           <span role="status">{cameraError || guideHint || camera}</span>
+          {available && !cameraError && !candidates.length && !nearDestination &&
+            <LivePassageProgress layout={cameraLayout} pose={minimapPose} />}
           {nearDestination && <button type="button" className="return-to-map" onClick={returnToMap}>2D 지도로 돌아가기</button>}
           {spacePicker}
           {modelNotice && <small>{modelNotice}</small>}

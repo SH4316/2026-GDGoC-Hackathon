@@ -1,0 +1,50 @@
+.passage-bar {
+  position: relative;
+  height: 5px;
+  background: #395448;
+  border-radius: 3px;
+}
+.passage-bar i {
+  display: block;
+  height: 100%;
+  background: #a6edc7;
+  border-radius: inherit;
+}
+.passage-bar b {
+  position: absolute;
+  top: -2px;
+  width: 3px;
+  height: 9px;
+  background: #e1f4e9;
+  transform: translateX(-50%);
+}
+.live-passage-progress {
+  margin: 9px 0 6px;
+  padding: 8px 0 4px;
+  border-top: 1px solid #446052;
+}
+.live-passage-reading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 7px;
+  color: #c9ded0;
+  font-size: 13px;
+}
+.live-passage-reading strong {
+  color: #a6edc7;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.passage-viewfinder {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  left: 50%;
+  width: min(36%, 24vh, 170px);
+  height: auto;
+  transform: translate(-50%, -50%);
+  color: #def5e8;
+  filter: drop-shadow(0 1px 2px #173626);
+}

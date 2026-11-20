@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode, type Ref } from 'react';
 import { RouteChat } from './RouteChat';
 import { RouteMap } from './RouteMap';
+import { PassagePreview } from '../ar/PassagePreview';
 import {
   currentOrigin, directionsApi, findRoute, formatMeters, watchLocation,
   type GeoPoint, type Journey, type JourneyProgress, type Place, type RouteMode,
@@ -212,6 +213,7 @@ export function Navigation({ trip, progress, updateGps, indoor, scanner, start, 
           {error && <p role="alert" className="nav-error">{error}</p>}
           <button className="start-route" type="button" disabled={!!busy || !destination || !!picking}
             onClick={() => void begin()}>{busy || '길 안내 시작'}</button>
+          <PassagePreview disabled={!!busy} />
           <button className="start-indoor" type="button" onClick={() => {
             routeRequest.current?.abort(); routeRequest.current = null; setBusy(''); setError(''); startIndoor();
           }}>태그로 실내 안내</button>
