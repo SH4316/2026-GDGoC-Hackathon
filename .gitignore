@@ -1,0 +1,4 @@
+/.worktree/
+/.env
+/.env.tmp.*
+/backend/.env
