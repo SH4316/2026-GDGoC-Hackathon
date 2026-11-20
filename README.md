@@ -6,6 +6,8 @@
 
 준비물은 스마트폰, A4 출력물, 줄자, 종이를 평평하게 고정할 테이프다. 평평한 바닥에서 출발점과 코너를 정하면 된다. 기본 코스는 **직진 2.00 m 후 오른쪽으로 1.75 m**다.
 
+![출발점, 코너, 도착점과 네 태그의 중심 좌표 및 인쇄물 방향](experiments/corridor/images/floor-layout.png)
+
 1. [태그·보정판 PDF](experiments/corridor/field-kit.pdf)에서 1~4쪽을 A4 **실제 크기 100%**로 인쇄한다. 검은 정사각형의 한 변은 160 mm, 아래 검산선은 100 mm다. 흰 여백을 보존한다.
 2. 바닥 출발점을 원점으로 잡는다. 출발할 때 정면을 +Y, 오른쪽을 +X로 두고 아래 위치에 **검은 정사각형의 중심**을 맞춘다. 종이의 ‘UP’ 쪽을 표의 방향으로 놓는다.
 3. 바닥에 코너 (0, 2)와 도착점 (1.75, 2)를 표시한다. 다른 통로에 맞출 때는 실측한 태그 중심, 방향, 경로 꼭짓점을 [배치 파일](frontend/public/station.json)에 입력한다. 단위는 m이며 태그 회전은 +Y에서 시계 방향이다.
@@ -17,9 +19,11 @@
 | 2 | −0.25 | 2 | 정면 (+Y) |
 | 3 | 1 | 2.25 | 오른쪽 (+X) |
 
+A4 인쇄용 PNG는 300 dpi다. [태그 0](experiments/corridor/images/tag-0.png) · [태그 1](experiments/corridor/images/tag-1.png) · [태그 2](experiments/corridor/images/tag-2.png) · [태그 3](experiments/corridor/images/tag-3.png) · [보정판](experiments/corridor/images/calibration-board.png)
+
 ## 스마트폰 실행
 
-Docker와 Compose가 있는 컴퓨터에서 아래 명령을 실행한다. 두 번째 명령의 로그에 나오는 HTTPS 주소를 스마트폰에서 연다. 로컬 포트의 기본값은 8080이다. 배치를 변경한 뒤에는 첫 번째 명령으로 다시 빌드한다.
+Docker와 Compose가 있는 컴퓨터에서 아래 명령을 실행한다. 웹 서버는 기본적으로 `0.0.0.0:8080`에서 수신한다. 스마트폰에서 AR 카메라를 사용할 때는 두 번째 명령의 로그에 나오는 HTTPS 주소를 연다. 배치를 변경한 뒤에는 첫 번째 명령으로 다시 빌드한다.
 
 ```bash
 ./scripts/compose-up.sh
@@ -28,7 +32,9 @@ docker compose logs cloudflared
 
 기본 후면 렌즈를 태그와 그 앞의 바닥이 함께 보이게 기울인다. 출발점에서 정면 화살표, 코너에 접근하면 오른쪽 화살표를 확인한다. 화살표를 그릴 바닥 위치가 화면 밖에 있거나 태그를 놓치면 영상만 보인다. 카메라 권한을 거부했다면 브라우저 사이트 설정에서 허용하고 화면을 한 번 누르거나 새로고침한다. 모바일 카메라 접근에는 HTTPS가 필요하다. [미디어 캡처 명세](https://www.w3.org/TR/mediacapture-streams/)
 
-로컬 개발은 Node.js 24.15 이상에서 다음과 같이 실행한다. 브라우저 주소는 Vite가 출력하는 localhost 주소다.
+[합성 시험 영상으로 캡처한 직진·우회전 AR 화면](experiments/corridor/images/ar-camera.png)
+
+로컬 개발은 Node.js 24.15 이상에서 다음과 같이 실행한다. 개발 서버(`npm run dev`, 기본 5173)와 빌드 미리보기(`npm run build` 후 `npm run preview`, 기본 4173)는 모두 `0.0.0.0`에서 수신한다. 같은 네트워크에서 페이지를 확인하려면 Vite가 출력한 `Network` 주소를 연다.
 
 ```bash
 cd frontend
