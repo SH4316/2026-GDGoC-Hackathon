@@ -45,6 +45,30 @@ adb reverse tcp:8080 tcp:8080
 
 기존 Docker Compose로 HTTPS 접속이 필요할 때는 `./scripts/compose-up.sh`를 실행하고 `docker compose logs cloudflared`에 출력되는 주소를 연다.
 
+### 고정 도메인에서 Certbot으로 HTTPS 실행
+
+`home.soohyuk.dev`의 원본 호스트에서 실행한다. Ubuntu와 같은 systemd 환경에서 Bash, Node.js 24.15 이상(npm 포함), Nginx, Certbot의 Nginx 플러그인, `sudo` 권한이 필요하다. Ubuntu에서는 다음과 같이 설치한다.
+
+```bash
+sudo apt update
+sudo apt install nginx certbot python3-certbot-nginx
+```
+
+도메인이 이 호스트를 가리키고 외부에서 TCP 80과 443으로 접근할 수 있어야 한다. 공유기 뒤의 호스트라면 두 포트를 전달한다. Cloudflare 프록시를 사용하는 경우 `http://home.soohyuk.dev/.well-known/acme-challenge/...` 요청이 최초 발급과 갱신 때 원본의 80번 포트에 도달해야 한다. 강제 HTTPS 규칙이 발급을 막으면 해당 경로를 규칙에서 제외한다. 인증서를 설치한 뒤 Cloudflare TLS 설정에는 Full (strict)를 사용한다. [Let's Encrypt HTTP-01](https://letsencrypt.org/docs/challenge-types/#http-01-challenge) · [Cloudflare Full (strict)](https://developers.cloudflare.com/ssl/origin-configuration/ssl-modes/full-strict/)
+
+```bash
+./scripts/certbot-up.sh YOUR_CERTBOT_EMAIL
+```
+
+스크립트는 프런트엔드를 빌드해 `/var/www/2026-hackathon-2`에 배포하고, Nginx에 도메인을 등록한 다음 Certbot으로 인증서와 HTTPS 리다이렉트를 설정한다. 같은 명령으로 새 빌드를 배포할 수 있다. 호스트에 같은 도메인의 Nginx 설정이 이미 있다면 그 설정에 이 앱의 정적 파일 경로를 반영하고 Certbot을 적용한다.
+
+발급 후 휴대폰에서 `https://home.soohyuk.dev`를 열고 카메라를 허용한다. Ubuntu 패키지의 갱신 타이머와 이 인증서의 갱신 경로는 다음 명령으로 확인한다.
+
+```bash
+systemctl status certbot.timer
+sudo certbot renew --cert-name 2026-hackathon-2-home.soohyuk.dev --dry-run
+```
+
 ### npm 개발 명령
 
 개발 서버(`npm run dev`, 기본 5173)와 빌드 미리보기(`npm run build` 후 `npm run preview`, 기본 4173)도 `0.0.0.0`에서 수신한다.
