@@ -6,3 +6,8 @@ dist/
 /backend/.env
 /data/recordings/*
 !/data/recordings/.gitkeep
+/data/station/
+/data/directions-cache/
+/backend/signs/.runtime/
+/backend/signs/__pycache__/
+/experiments/corridor/20261120_222007.mp4

@@ -1,10 +1,11 @@
 import {
-  BadRequestException, Body, Controller, Get, Headers, Param, ParseUUIDPipe,
-  PayloadTooLargeException, Put, Req, UnsupportedMediaTypeException,
+  BadRequestException, Body, Controller, Get, Header, Headers, Param, ParseUUIDPipe,
+  PayloadTooLargeException, Put, Req, UploadedFile, UseInterceptors, UnsupportedMediaTypeException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request } from 'express';
 import { z } from 'zod';
-import { finishSchema, frameSchema, sessionSchema } from './schema.js';
+import { debugBatchSchema, finishSchema, frameSchema, samplesSchema, sessionSchema } from './schema.js';
 import { MAX_SCAN, RecordingStore } from './store.js';
 
 function parse<T>(schema: z.ZodType<T>, value: unknown): T {
@@ -51,16 +52,50 @@ export class RecordingsController {
     return this.store.frame(id, Number(seq), metadata, Buffer.concat(chunks));
   }
 
+  @Put(':id/parts/:seq')
+  @UseInterceptors(FileInterceptor('video', { limits: { fileSize: 4 * 1024 * 1024,
+    files: 1, fields: 1, parts: 3, fieldSize: 512 * 1024 } }))
+  part(@Param('id', idPipe) id: string, @Param('seq') seq: string,
+       @Body('samples') input: string, @UploadedFile() file?: { buffer: Buffer }) {
+    if (!/^(0|[1-9]\d{0,5})$/.test(seq) || !file) throw new BadRequestException('Invalid recording part');
+    let samples: unknown;
+    try { samples = JSON.parse(input); } catch { throw new BadRequestException('Invalid motion samples'); }
+    return this.store.part(id, Number(seq), file.buffer, parse(samplesSchema, samples));
+  }
+
+  @Get(':id/capture.zip')
+  bundle(@Param('id', idPipe) id: string) { return this.store.bundle(id); }
+
+  @Put(':id/debug/:offset')
+  debugBatch(@Param('id', idPipe) id: string, @Param('offset') offset: string, @Body() input: unknown) {
+    if (!/^(0|[1-9]\d{0,9})$/.test(offset)) throw new BadRequestException('Invalid debug row offset');
+    return this.store.debugBatch(id, Number(offset), parse(debugBatchSchema, input));
+  }
+
+  @Get(':id/debug.csv')
+  @Header('Cache-Control', 'no-store')
+  debugCsv(@Param('id', idPipe) id: string) { return this.store.debugCsv(id); }
+
   @Put(':id/finish')
   finish(@Param('id', idPipe) id: string, @Body() input: unknown) {
-    return this.store.finish(id, parse(finishSchema, input).frameCount);
+    return this.store.finish(id, parse(finishSchema, input));
   }
 
   @Get(':id/scene.ply')
   cloud(@Param('id', idPipe) id: string) { return this.store.cloud(id); }
 
   @Get(':id/status')
+  @Header('Cache-Control', 'no-store')
   status(@Param('id', idPipe) id: string) { return this.store.status(id); }
+
+  @Put(':id/lidar-session')
+  lidarSession(@Param('id', idPipe) id: string) { return this.store.createLidarSession(id); }
+
+  @Get(':id/lidar/:format')
+  scanFile(@Param('id', idPipe) id: string, @Param('format') format: string) {
+    if (format !== 'ply' && format !== 'usdz') throw new UnsupportedMediaTypeException('Use PLY or USDZ');
+    return this.store.scanFile(id, format);
+  }
 
   @Put(':id/lidar/:format')
   scan(@Param('id', idPipe) id: string, @Param('format') format: string, @Req() req: Request) {

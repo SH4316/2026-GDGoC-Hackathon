@@ -2,3 +2,5 @@ node_modules
 dist
 .env
 tests
+signs/.runtime
+signs/__pycache__

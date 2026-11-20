@@ -89,7 +89,7 @@ async function startServer(root) {
   const { port } = socket.address();
   await new Promise(resolve => socket.close(resolve));
   const proc = spawn(process.execPath, ['dist/main.js'], { cwd: join(__dirname, '..'),
-    env: { ...process.env, API_PORT: String(port), API_HOST: '127.0.0.1', RECORDINGS_DIR: root },
+    env: { ...process.env, API_PORT: String(port), API_HOST: '127.0.0.1', RECORDINGS_DIR: root, STATION_DIR: join(root, 'station') },
     stdio: ['ignore', 'pipe', 'pipe'] });
   let output = '';
   proc.stdout.on('data', bytes => { output += bytes; });
@@ -107,6 +107,7 @@ async function startServer(root) {
     throw error;
   }
   return { get: suffix => fetch(base + suffix),
+    multipart: (suffix, body) => fetch(base + suffix, { method: 'PUT', body }),
     put: (suffix, body, type = 'application/json', headers) => fetch(base + suffix, {
       method: 'PUT', headers: { 'Content-Type': type, ...headers }, body: type === 'application/json' ? JSON.stringify(body) : body,
     }),
@@ -117,6 +118,32 @@ async function startServer(root) {
 function upload(server, id, seq, bytes, meta) {
   return server.put(`${id}/frames/${seq}`, bytes, 'image/jpeg', { 'X-Frame-Meta': JSON.stringify(meta) });
 }
+
+test('debug rows survive restarts and lost acknowledgements, and conflicting batches roll back', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'ar-debug-api-'));
+  let server = await startServer(root);
+  t.after(async () => { await server.stop(); await rm(root, { recursive: true, force: true }); });
+  const id = randomUUID();
+  const put = (offset, rows, time = startedAtMs) => server.put(id + '/debug/' + offset, { startedAtMs: time, rows });
+  const motion = ['30.000', 0, 1, 2, null, null, null, 'default', 'motion', 1, 2, null];
+  const tag = ['20.000', null, null, null, null, null, null, 'default', 'tag', 0, 1, 2];
+  const earlier = ['10.000', null, null, null, 0, 9.81, 0, null, null, null, null, null];
+  assert.equal((await server.get(id + '/debug.csv')).status, 404);
+  assert.equal((await put(1, [tag])).status, 200);
+  assert.equal((await put(0, [earlier, motion])).status, 409);
+  assert.equal((await (await server.get(id + '/debug.csv')).text()).trimEnd().split('\r\n').length, 2);
+  assert.equal((await put(0, [motion, tag])).status, 200);
+  assert.equal((await put(2, [earlier], startedAtMs + 1)).status, 409);
+  assert.equal((await put(2, [[...earlier.slice(0, 7), 'bad,space', 'tag', 1, 2, 3]])).status, 400);
+  await server.stop();
+  server = await startServer(root);
+  const acknowledgements = await Promise.all([put(0, [motion, tag]), put(0, [motion, tag]), put(2, [earlier])]);
+  assert.ok(acknowledgements.every(response => response.status === 200));
+  assert.deepEqual(await acknowledgements[0].json(), { id, offset: 0, rows: 2 });
+  const csv = await server.get(id + '/debug.csv');
+  assert.match(csv.headers.get('content-type'), /text\/csv/);
+  assert.deepEqual((await csv.text()).trimEnd().split('\r\n').slice(1), [earlier, tag, motion].map(row => row.join(',')));
+});
 
 function decodePly(buffer) {
   const suffix = 'end_header\n';
@@ -243,4 +270,58 @@ test('recordings persist aligned frame pairs, reconstruct scene geometry and acc
   const restored = await (await server.get(`${id}/status`)).json();
   assert.deepEqual([restored.frameCount, restored.finished, restored.reconstruction.state], [positions.length, true, 'ready']);
   assert.deepEqual(await readFile(join(root, id, 'lidar.ply')), scan);
+});
+
+test('capture parts resume in order and seal for offline mapping across restarts', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'station-capture-'));
+  let server = await startServer(root);
+  t.after(async () => { await server.stop(); await rm(root, { recursive: true, force: true }); });
+  const id = randomUUID();
+  const capture = { mimeType: 'video/mp4', mediaTimeAtStartS: 14.25, motionPermission: 'granted' };
+  assert.equal((await server.put(id, { startedAtMs, station, capture })).status, 200);
+  const sample = { tMs: 32, acceleration: [1, 2, 3], accelerationIncludingGravity: null,
+    rotationRate: null, screenAngleDeg: 0 };
+  const part = (seq, bytes, samples) => {
+    const body = new FormData();
+    body.append('video', new Blob([bytes]), 'video.bin');
+    body.append('samples', JSON.stringify(samples));
+    return server.multipart(id + '/parts/' + seq, body);
+  };
+  const finish = { frameCount: 0, partCount: 3, end: 'interrupted' };
+  assert.equal((await part(1, 'second', [])).status, 200);
+  assert.equal((await server.get(id + '/capture.zip')).status, 404);
+  assert.equal((await server.put(id + '/finish', finish)).status, 409);
+  assert.equal((await part(0, 'first', [sample])).status, 200);
+  assert.equal((await part(0, 'first', [sample])).status, 200);
+  assert.equal((await part(0, 'other', [sample])).status, 409);
+  assert.equal((await part(2, '', [{ ...sample, tMs: -1 }])).status, 400);
+  assert.equal((await part(2, '', [{ ...sample, tMs: 60 }])).status, 200);
+  assert.equal((await server.put(id + '/finish', { frameCount: 0 })).status, 400);
+  assert.equal((await server.put(id + '/finish', finish)).status, 200);
+  assert.equal((await server.put(id + '/finish', finish)).status, 200);
+  assert.equal((await part(3, 'late', [])).status, 409);
+  await server.stop();
+  server = await startServer(root);
+  const status = await (await server.get(id + '/status')).json();
+  assert.equal(status.finished, true);
+  assert.equal(status.reconstruction, null);
+  assert.deepEqual(status.scans, []);
+  const mesh = Buffer.from('ply\nformat binary_little_endian 1.0\nelement vertex 3\nproperty float x\nproperty float y\nproperty float z\nelement face 1\nproperty list uchar int vertex_indices\nend_header\n');
+  const payload = Buffer.alloc(49);
+  payload.writeFloatLE(1, 12);
+  payload.writeFloatLE(1, 28);
+  payload[36] = 3;
+  payload.writeInt32LE(1, 41);
+  payload.writeInt32LE(2, 45);
+  const scan = Buffer.concat([mesh, payload]);
+  assert.equal((await server.put(id + '/lidar/ply', scan, 'application/octet-stream')).status, 200);
+  assert.deepEqual((await (await server.get(id + '/status')).json()).scans, [{ format: 'ply', bytes: scan.length }]);
+  const result = await server.get(id + '/capture.zip');
+  assert.equal(result.headers.get('content-type'), 'application/zip');
+  const zip = Buffer.from(await result.arrayBuffer());
+  assert.equal(zip.readUInt32LE(0), 0x04034b50);
+  for (const name of ['manifest.json', 'session.json', 'finish.json', 'video.mp4', 'motion.ndjson', 'lidar.ply'])
+    assert.ok(zip.includes(Buffer.from(name)), name);
+  assert.ok(zip.includes(Buffer.from('firstsecond')));
+  assert.deepEqual(JSON.parse(await readFile(join(root, id, 'parts/000000/motion.ndjson'), 'utf8')), sample);
 });

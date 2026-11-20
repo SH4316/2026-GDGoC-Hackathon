@@ -1,17 +1,38 @@
 services:
-  collector:
+  cliproxyapi:
+    image: eceasy/cli-proxy-api:v8.0.79
+    restart: unless-stopped
+    configs:
+      - source: cliproxy_config
+        target: /CLIProxyAPI/config.yaml
+    volumes:
+      - cliproxy_auth:/root/.cli-proxy-api
+  backend:
     build:
       context: ./backend
       target: development
+    depends_on:
+      - cliproxyapi
     user: "${COLLECTOR_UID:-1000}:${COLLECTOR_GID:-1000}"
     restart: unless-stopped
     environment:
       API_PORT: "8081"
+      CLIPROXY_BASE_URL: "${CLIPROXY_BASE_URL:-http://cliproxyapi:8317/v1}"
+      CLIPROXY_MODEL: "${CLIPROXY_MODEL:-gpt-6-luna}"
+      CLIPROXY_API_KEY: "${CLIPROXY_API_KEY:?Run scripts/compose-up.sh to generate the proxy client key}"
+      TMAP_APP_KEY: "${TMAP_APP_KEY:-}"
+      KAKAO_REST_API_KEY: "${KAKAO_REST_API_KEY:-}"
       RECORDINGS_DIR: /data/recordings
+      STATION_DIR: /data/station
+      DIRECTIONS_TEST_CACHE: "${DIRECTIONS_TEST_CACHE:-0}"
+      DIRECTIONS_CACHE_DIR: /data/directions-cache
     volumes:
       - ./backend/src:/app/backend/src:ro
       - ./backend/reconstruct.cjs:/app/backend/reconstruct.cjs:ro
+      - ./frontend/public:/app/frontend/public:ro
       - ${RECORDINGS_DIR:-./data/recordings}:/data/recordings
+      - ${STATION_DIR:-./data/station}:/data/station
+      - ${DIRECTIONS_CACHE_DIR:-./data/directions-cache}:/data/directions-cache
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8081/api/recordings/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 5s
@@ -22,16 +43,15 @@ services:
     build: ./frontend
     restart: unless-stopped
     volumes:
-      - ./frontend/public/station.json:/usr/share/nginx/html/station.json:ro
       - ./frontend/public/ar:/usr/share/nginx/html/ar:ro
       - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
-      collector:
+      backend:
         condition: service_healthy
     ports:
       - "127.0.0.1:${APP_PORT:-8080}:80"
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/station.json"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/api/station"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -50,6 +70,23 @@ services:
       web:
         condition: service_healthy
 
+configs:
+  cliproxy_config:
+    content: |
+      config-version: 8
+      server:
+        port: 8317
+        discovery:
+          enabled: false
+      management:
+        disable-control-panel: true
+      access:
+        api-keys:
+          - "${CLIPROXY_API_KEY:?Run scripts/compose-up.sh to generate the proxy client key}"
+      oauth:
+        auth-dir: /root/.cli-proxy-api
+
 volumes:
+  cliproxy_auth:
   caddy_data:
   caddy_config:

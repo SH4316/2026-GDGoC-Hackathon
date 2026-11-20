@@ -1,0 +1,6869 @@
+{
+  "date": "2026-11-20",
+  "api": "POST /api/signs/recognize",
+  "browser": "Chromium 159.0.8154.6",
+  "implementation_sha256": {
+    "before": {
+      "backend/signs/recognize.py": "ee5de6374b59386617aaada4a7cced2f1f3e57651b75721e735e21c147b68375",
+      "backend/signs/routes.py": "70268a93f2e08aad0abd0b793442ef93aafa625c81f44f92cc94b0e52c4064c0",
+      "backend/signs/network.json": "f364a47e851010ec60d23d384a7e62d127d9f20766b64c42424810e0a203eb35",
+      "backend/src/signs.controller.ts": "99cfedb579648a2524d7eecaac9060f11c92a88249212e0e3eee0e49384ae1bf",
+      "frontend/src/SignReader.tsx": "b53e0feae791741322c016519b66798f49f8ae9d23508b7e6db550f057c7b615"
+    },
+    "after": {
+      "backend/signs/recognize.py": "fff58072980b833b06eabd0ad47dc808ca3fcdd69310387f155ea77d9bda501b",
+      "backend/signs/routes.py": "9c3ab175ac0d112893ffea9bc634fe921242f1580bd9afb6c7bb0bc5bb7afc2a",
+      "backend/signs/network.json": "f364a47e851010ec60d23d384a7e62d127d9f20766b64c42424810e0a203eb35",
+      "backend/src/signs.controller.ts": "99cfedb579648a2524d7eecaac9060f11c92a88249212e0e3eee0e49384ae1bf",
+      "frontend/src/SignReader.tsx": "6ed01b0cf8546e19bd95d37e4f7d7b3918b1dc7d783d91e690c518975ebdc178",
+      "backend/signs/arrows.py": "5a69b2f2853058cef8d04b28a2ddef602e240e8c264991734467b02d867322d8"
+    }
+  },
+  "scoring": "correct requires matching line, current name, arrow and toward; recorded left/right names were also checked for correct outputs. expected_abstention means pending for a hold case. Incorrect includes choosing a direction for a hold case.",
+  "inputs": {
+    "photo_before": "original bytes sent directly to previous API, including its input validations",
+    "photo_after": "upload intercepted at the browser photo selector, actual API reply and screen text checked",
+    "scaled_before": "long edge limited to 1680 px, Chromium canvas JPEG .94, same bytes as scaled_after",
+    "scaled_after": "same JPEG to improved API"
+  },
+  "source_image_number": "촬영자 원문 .tt_article_useless_p_margin 안에서 img 요소를 1부터 센 순서. 내려받은 파일을 original_sha256과 대조.",
+  "samples": [
+    {
+      "id": "P01",
+      "split": "development",
+      "source": "https://platfrom.tistory.com/entry/%EC%96%91%EC%B2%9C%EA%B5%AC%EC%B2%AD%EC%97%AD%EC%84%9C%EC%9A%B8",
+      "article_image_number": 3,
+      "original_size": [
+        3000,
+        2000
+      ],
+      "original_bytes": 967128,
+      "original_sha256": "73ca6f2f9a15a9f115e4f66c8db085cc0d3788b114748fdda4097428683919f8",
+      "expected": {
+        "group": "three",
+        "line": "2호선",
+        "current": "양천구청",
+        "left": "도림천",
+        "right": "신정네거리",
+        "arrow": "left",
+        "toward": "도림천",
+        "note": "벽면, 234-2 지선 표지"
+      },
+      "photo_before": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "2호선",
+          "left": {
+            "code": "234-1",
+            "name": "도림천",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "234-2",
+            "name": "양천구청",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "234-3",
+            "name": "신정네거리",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "도림천"
+        },
+        "sha256": "73ca6f2f9a15a9f115e4f66c8db085cc0d3788b114748fdda4097428683919f8"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "2호선",
+          "left": {
+            "code": "234-1",
+            "name": "도림천",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "234-2",
+            "name": "양천구청",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "234-3",
+            "name": "신정네거리",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "도림천"
+        },
+        "bytes": 967128,
+        "sha256": "73ca6f2f9a15a9f115e4f66c8db085cc0d3788b114748fdda4097428683919f8"
+      },
+      "scaled_before": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "2호선",
+          "left": {
+            "code": "234-1",
+            "name": "도림천",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "234-2",
+            "name": "양천구청",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "234-3",
+            "name": "신정네거리",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "도림천"
+        },
+        "sha256": "661b247b95accaa69d7397319c2f46ecf342ac791ff4e196df0d02e3e8315aed"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "2호선",
+          "left": {
+            "code": "234-1",
+            "name": "도림천",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "234-2",
+            "name": "양천구청",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "234-3",
+            "name": "신정네거리",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "도림천"
+        },
+        "sha256": "661b247b95accaa69d7397319c2f46ecf342ac791ff4e196df0d02e3e8315aed"
+      }
+    },
+    {
+      "id": "P25",
+      "split": "development",
+      "source": "https://platfrom.tistory.com/entry/%EA%B5%AD%ED%9A%8C%EC%9D%98%EC%82%AC%EB%8B%B9%EC%97%AD%EC%84%9C%EC%9A%B8",
+      "article_image_number": 18,
+      "original_size": [
+        2000,
+        1333
+      ],
+      "original_bytes": 236809,
+      "original_sha256": "745d0d1fc0a339eca7fb18273e2848055bbb1cd532f269ded29578224becc382",
+      "expected": {
+        "group": "tiered",
+        "line": "9호선",
+        "current": "국회의사당",
+        "left": "여의도",
+        "right": "당산",
+        "arrow": "right",
+        "toward": "당산",
+        "note": "위쪽 현재역 옆 삼각형, 아래 양옆 역명, 비스듬한 촬영"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "745d0d1fc0a339eca7fb18273e2848055bbb1cd532f269ded29578224becc382"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 236809,
+        "sha256": "745d0d1fc0a339eca7fb18273e2848055bbb1cd532f269ded29578224becc382"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "da6d5f3f88bd77f11bfd71562ddbb0a8926db99ef7dbad0cf38207644d19311c"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "da6d5f3f88bd77f11bfd71562ddbb0a8926db99ef7dbad0cf38207644d19311c"
+      }
+    },
+    {
+      "id": "P31",
+      "split": "development",
+      "source": "https://platfrom.tistory.com/entry/%EC%8B%A0%ED%8F%AC%EC%97%AD%EC%9D%B8%EC%B2%9C",
+      "article_image_number": 15,
+      "original_size": [
+        1500,
+        1000
+      ],
+      "original_bytes": 776948,
+      "original_sha256": "21e1b9db0b5b0fe2e9b8d278c495dc6640ef830e842b050f61edc3ee8a9928fe",
+      "expected": {
+        "group": "tiered",
+        "line": "수인분당선",
+        "current": "신포",
+        "left": "인천",
+        "right": "숭의",
+        "arrow": "right",
+        "toward": "숭의",
+        "note": "세로형, 촬영 당시 수인선 K263"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "21e1b9db0b5b0fe2e9b8d278c495dc6640ef830e842b050f61edc3ee8a9928fe"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "bytes": 776948,
+        "sha256": "21e1b9db0b5b0fe2e9b8d278c495dc6640ef830e842b050f61edc3ee8a9928fe"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "63e8824ccd5d1cc99daa8cf7079fabcf51df449dce440f941f90cd00f817267a"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "63e8824ccd5d1cc99daa8cf7079fabcf51df449dce440f941f90cd00f817267a"
+      }
+    },
+    {
+      "id": "P35",
+      "split": "development",
+      "source": "https://platfrom.tistory.com/entry/%EC%9B%90%EC%9D%B8%EC%9E%AC%EC%97%AD%EC%9D%B8%EC%B2%9C",
+      "article_image_number": 17,
+      "original_size": [
+        1500,
+        1000
+      ],
+      "original_bytes": 1003734,
+      "original_sha256": "a3a97ddba70c6f7817a9254a65e1355187c20ff95fb70024f4b1551abe90576e",
+      "expected": {
+        "group": "hold",
+        "line": "인천1호선",
+        "current": "원인재",
+        "left": "신연수",
+        "right": "동춘",
+        "arrow": null,
+        "toward": null,
+        "note": "좌우에 반대 화살표 두 개, 옆에 수인선 환승 화살표도 있음"
+      },
+      "photo_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "a3a97ddba70c6f7817a9254a65e1355187c20ff95fb70024f4b1551abe90576e"
+      },
+      "photo_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "bytes": 1003734,
+        "sha256": "a3a97ddba70c6f7817a9254a65e1355187c20ff95fb70024f4b1551abe90576e"
+      },
+      "scaled_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "37cc1af2d23def4c25d2e9100a891ded583362bde677f9b90f3c258de480f94d"
+      },
+      "scaled_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "37cc1af2d23def4c25d2e9100a891ded583362bde677f9b90f3c258de480f94d"
+      }
+    },
+    {
+      "id": "P44",
+      "split": "development",
+      "source": "https://platfrom.tistory.com/entry/%EC%8B%A0%EA%B8%B8%EC%98%A8%EC%B2%9C%EC%97%AD%EA%B2%BD%EA%B8%B0",
+      "article_image_number": 12,
+      "original_size": [
+        1500,
+        1000
+      ],
+      "original_bytes": 1077586,
+      "original_sha256": "968282544237688598f300ad1906e7371c9bdec2c21d2895c5e1140c0b0cedfb",
+      "expected": {
+        "group": "faint",
+        "line": "4호선",
+        "current": "신길온천",
+        "left": "정왕",
+        "right": null,
+        "arrow": "left",
+        "toward": "정왕",
+        "note": "원거리, 반대편 역명 식별 어려움"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "968282544237688598f300ad1906e7371c9bdec2c21d2895c5e1140c0b0cedfb"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "bytes": 1077586,
+        "sha256": "968282544237688598f300ad1906e7371c9bdec2c21d2895c5e1140c0b0cedfb"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "b0ffa61de2c8c3d3c6f7438be091e88bd5058d0cf930dcc763acd66e319bda49"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "b0ffa61de2c8c3d3c6f7438be091e88bd5058d0cf930dcc763acd66e319bda49"
+      }
+    },
+    {
+      "id": "P46",
+      "split": "development",
+      "source": "https://platfrom.tistory.com/entry/%EC%B4%88%EC%A7%80%EC%97%AD%EA%B2%BD%EA%B8%B0",
+      "article_image_number": 13,
+      "original_size": [
+        1500,
+        1000
+      ],
+      "original_bytes": 927291,
+      "original_sha256": "2d179bd02a6e90836329fd3a90120de2bcf39ec30dfa3a393fd64c6934998e67",
+      "expected": {
+        "group": "three",
+        "line": "4호선",
+        "current": "초지",
+        "left": "고잔",
+        "right": "안산",
+        "arrow": "right",
+        "toward": "안산",
+        "note": "452, 역명 아래에 길게 이어지는 노란 화살표"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "2d179bd02a6e90836329fd3a90120de2bcf39ec30dfa3a393fd64c6934998e67"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "4호선",
+          "left": {
+            "code": "451",
+            "name": "고잔",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "452",
+            "name": "초지",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "453",
+            "name": "안산",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "arrow": "right",
+          "toward": "안산"
+        },
+        "bytes": 927291,
+        "sha256": "2d179bd02a6e90836329fd3a90120de2bcf39ec30dfa3a393fd64c6934998e67"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "ed6985f33ef988657a50facb928a6a58dff6e3bb3f32fc90a5ed6c6476a2d83e"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "4호선",
+          "left": {
+            "code": "451",
+            "name": "고잔",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "452",
+            "name": "초지",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "453",
+            "name": "안산",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "arrow": "right",
+          "toward": "안산"
+        },
+        "sha256": "ed6985f33ef988657a50facb928a6a58dff6e3bb3f32fc90a5ed6c6476a2d83e"
+      }
+    },
+    {
+      "id": "P49",
+      "split": "development",
+      "source": "https://platfrom.tistory.com/entry/%ED%95%9C%EB%8C%80%EC%95%9E%EC%97%AD%EA%B2%BD%EA%B8%B0",
+      "article_image_number": 13,
+      "original_size": [
+        1500,
+        1000
+      ],
+      "original_bytes": 981475,
+      "original_sha256": "382cc578552e7d7937ecd7ee5d34ef4d3511ac5b32375f32df121e79e4991768",
+      "expected": {
+        "group": "three",
+        "line": "4호선",
+        "current": "한대앞",
+        "left": "상록수",
+        "right": "중앙",
+        "arrow": "right",
+        "toward": "중앙",
+        "note": "449, 기울어진 천장형 표지"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "4호선",
+          "left": {
+            "code": "448",
+            "name": "상록수",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "449",
+            "name": "한대앞",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "right": {
+            "code": "450",
+            "name": "중앙",
+            "nameRead": true,
+            "codeRead": false
+          }
+        },
+        "sha256": "382cc578552e7d7937ecd7ee5d34ef4d3511ac5b32375f32df121e79e4991768"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "4호선",
+          "left": {
+            "code": "448",
+            "name": "상록수",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "449",
+            "name": "한대앞",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "450",
+            "name": "중앙",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "right",
+          "toward": "중앙"
+        },
+        "bytes": 981475,
+        "sha256": "382cc578552e7d7937ecd7ee5d34ef4d3511ac5b32375f32df121e79e4991768"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "4호선",
+          "left": {
+            "code": "448",
+            "name": "상록수",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "449",
+            "name": "한대앞",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "right": {
+            "code": "450",
+            "name": "중앙",
+            "nameRead": true,
+            "codeRead": false
+          }
+        },
+        "sha256": "204e860ae5dff3ff726b5f67d7757162ddc871b3f8558fd0f8266911d4faff38"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "4호선",
+          "left": {
+            "code": "448",
+            "name": "상록수",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "449",
+            "name": "한대앞",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "450",
+            "name": "중앙",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "arrow": "right",
+          "toward": "중앙"
+        },
+        "sha256": "204e860ae5dff3ff726b5f67d7757162ddc871b3f8558fd0f8266911d4faff38"
+      }
+    },
+    {
+      "id": "P52",
+      "split": "development",
+      "source": "https://platfrom.tistory.com/entry/%EB%B0%98%EC%9B%94%EC%97%AD%EA%B2%BD%EA%B8%B0",
+      "article_image_number": 14,
+      "original_size": [
+        1500,
+        1000
+      ],
+      "original_bytes": 1093899,
+      "original_sha256": "9d8bd335b6b83b3befdaa3d3f484995a84bc3c0dde06bfc2e7b598c5007b578a",
+      "expected": {
+        "group": "faint",
+        "line": "4호선",
+        "current": "반월",
+        "left": null,
+        "right": "상록수",
+        "arrow": "right",
+        "toward": "상록수",
+        "note": "원거리 급각도, 희미한 반대편 역명"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "9d8bd335b6b83b3befdaa3d3f484995a84bc3c0dde06bfc2e7b598c5007b578a"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 1093899,
+        "sha256": "9d8bd335b6b83b3befdaa3d3f484995a84bc3c0dde06bfc2e7b598c5007b578a"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "8c6ccd03dc18eff90118da14fabd6ec99796d0abdedeeb1a60e22ebb340a6bb3"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "8c6ccd03dc18eff90118da14fabd6ec99796d0abdedeeb1a60e22ebb340a6bb3"
+      }
+    },
+    {
+      "id": "P55",
+      "split": "development",
+      "source": "https://platfrom.tistory.com/entry/%EC%82%B0%EB%B3%B8%EC%97%AD%EA%B2%BD%EA%B8%B0",
+      "article_image_number": 16,
+      "original_size": [
+        1500,
+        1000
+      ],
+      "original_bytes": 966950,
+      "original_sha256": "35a6cd46a96e33d390211247734a33648246b578ef034fb3b1dce6410732b75c",
+      "expected": {
+        "group": "three",
+        "line": "4호선",
+        "current": "산본",
+        "left": "금정",
+        "right": "수리산",
+        "arrow": "right",
+        "toward": "수리산",
+        "note": "444, 역명 아래 긴 노란 화살표"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "4호선",
+          "left": {
+            "code": "443",
+            "name": "금정",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "444",
+            "name": "산본",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "445",
+            "name": "수리산",
+            "nameRead": true,
+            "codeRead": true
+          }
+        },
+        "sha256": "35a6cd46a96e33d390211247734a33648246b578ef034fb3b1dce6410732b75c"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "4호선",
+          "left": {
+            "code": "443",
+            "name": "금정",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "444",
+            "name": "산본",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "445",
+            "name": "수리산",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "arrow": "right",
+          "toward": "수리산"
+        },
+        "bytes": 966950,
+        "sha256": "35a6cd46a96e33d390211247734a33648246b578ef034fb3b1dce6410732b75c"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "4호선",
+          "left": {
+            "code": "443",
+            "name": "금정",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "444",
+            "name": "산본",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "445",
+            "name": "수리산",
+            "nameRead": true,
+            "codeRead": true
+          }
+        },
+        "sha256": "05bf06d88fae593bba7ee5d419c36a85cc49297dcdbe29da67709b2903e62139"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "4호선",
+          "left": {
+            "code": "443",
+            "name": "금정",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "444",
+            "name": "산본",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "445",
+            "name": "수리산",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "arrow": "right",
+          "toward": "수리산"
+        },
+        "sha256": "05bf06d88fae593bba7ee5d419c36a85cc49297dcdbe29da67709b2903e62139"
+      }
+    },
+    {
+      "id": "P57",
+      "split": "development",
+      "source": "https://platfrom.tistory.com/entry/%EA%B0%95%EB%82%A8%EB%8C%80%EC%97%AD%EA%B2%BD%EA%B8%B0",
+      "article_image_number": 5,
+      "original_size": [
+        1500,
+        1000
+      ],
+      "original_bytes": 1842580,
+      "original_sha256": "a80c83b0a638968f05109b7b5c39c5277b7fe650fae4b502ff64faa51ad75c59",
+      "expected": {
+        "group": "three",
+        "line": "에버라인",
+        "current": "강남대",
+        "left": "지석",
+        "right": "기흥",
+        "arrow": "left",
+        "toward": "지석",
+        "note": "양쪽에 각각 왼쪽을 향하는 화살표"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "에버라인",
+          "left": {
+            "code": "Y112",
+            "name": "지석",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "Y111",
+            "name": "강남대",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "right": {
+            "code": "Y110",
+            "name": "기흥",
+            "nameRead": true,
+            "codeRead": false
+          }
+        },
+        "sha256": "a80c83b0a638968f05109b7b5c39c5277b7fe650fae4b502ff64faa51ad75c59"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "에버라인",
+          "left": {
+            "code": "Y112",
+            "name": "지석",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "Y111",
+            "name": "강남대",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "right": {
+            "code": "Y110",
+            "name": "기흥",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "지석"
+        },
+        "bytes": 1842580,
+        "sha256": "a80c83b0a638968f05109b7b5c39c5277b7fe650fae4b502ff64faa51ad75c59"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "에버라인",
+          "left": {
+            "code": "Y112",
+            "name": "지석",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "Y111",
+            "name": "강남대",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "right": {
+            "code": "Y110",
+            "name": "기흥",
+            "nameRead": true,
+            "codeRead": false
+          }
+        },
+        "sha256": "ca0c23cd2b0f7fd9f27e733b2e5d9392aa9d1fbdc0f159f6774e2d6d27e23d30"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "에버라인",
+          "left": {
+            "code": "Y112",
+            "name": "지석",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "Y111",
+            "name": "강남대",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "right": {
+            "code": "Y110",
+            "name": "기흥",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "지석"
+        },
+        "sha256": "ca0c23cd2b0f7fd9f27e733b2e5d9392aa9d1fbdc0f159f6774e2d6d27e23d30"
+      }
+    },
+    {
+      "id": "P67",
+      "split": "development",
+      "source": "https://platfrom.tistory.com/entry/%EB%B6%80%EB%B0%9C%EC%97%AD%EA%B2%BD%EA%B8%B0",
+      "article_image_number": 26,
+      "original_size": [
+        5472,
+        3648
+      ],
+      "original_bytes": 7202551,
+      "original_sha256": "c59f39a2eb698d1d337c44a3c4b91a3060eae9bc785edee01a0c4aef5462b26a",
+      "expected": {
+        "group": "three",
+        "line": "경강선",
+        "current": "부발",
+        "left": "세종대왕릉",
+        "right": "이천",
+        "arrow": "left",
+        "toward": "세종대왕릉",
+        "note": "K418, 노란 띠의 왼쪽 끝이 화살촉"
+      },
+      "photo_before": {
+        "outcome": "input_rejected",
+        "http": 413,
+        "body": {
+          "message": "File too large",
+          "error": "Payload Too Large",
+          "statusCode": 413
+        },
+        "sha256": "c59f39a2eb698d1d337c44a3c4b91a3060eae9bc785edee01a0c4aef5462b26a"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "경강선",
+          "left": {
+            "code": "K419",
+            "name": "세종대왕릉",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "K418",
+            "name": "부발",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "K417",
+            "name": "이천",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "세종대왕릉"
+        },
+        "bytes": 500281,
+        "sha256": "1ff91d182728be7eac534d9fb56454aba103b2998c3eeb99e79f24fdfb27bd07"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "경강선",
+          "left": {
+            "code": "K419",
+            "name": "세종대왕릉",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "K418",
+            "name": "부발",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "K417",
+            "name": "이천",
+            "nameRead": true,
+            "codeRead": false
+          }
+        },
+        "sha256": "1ff91d182728be7eac534d9fb56454aba103b2998c3eeb99e79f24fdfb27bd07"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "경강선",
+          "left": {
+            "code": "K419",
+            "name": "세종대왕릉",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "K418",
+            "name": "부발",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "K417",
+            "name": "이천",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "세종대왕릉"
+        },
+        "sha256": "1ff91d182728be7eac534d9fb56454aba103b2998c3eeb99e79f24fdfb27bd07"
+      }
+    },
+    {
+      "id": "P69",
+      "split": "development",
+      "source": "https://platfrom.tistory.com/entry/%EC%8B%A0%EB%91%94%EB%8F%84%EC%98%88%EC%B4%8C%EC%97%AD%EA%B2%BD%EA%B8%B0",
+      "article_image_number": 3,
+      "original_size": [
+        5472,
+        3648
+      ],
+      "original_bytes": 7145100,
+      "original_sha256": "531c7da3b4568e5bd335cac73d39909e15bcb53ac3ad7368f896f33bb2b22b18",
+      "expected": {
+        "group": "three",
+        "line": "경강선",
+        "current": "신둔도예촌",
+        "left": "곤지암",
+        "right": "이천",
+        "arrow": "right",
+        "toward": "이천",
+        "note": "역명 아래 긴 노란 화살표"
+      },
+      "photo_before": {
+        "outcome": "input_rejected",
+        "http": 413,
+        "body": {
+          "message": "File too large",
+          "error": "Payload Too Large",
+          "statusCode": 413
+        },
+        "sha256": "531c7da3b4568e5bd335cac73d39909e15bcb53ac3ad7368f896f33bb2b22b18"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "경강선",
+          "left": {
+            "code": "K415",
+            "name": "곤지암",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "K416",
+            "name": "신둔도예촌",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "right": {
+            "code": "K417",
+            "name": "이천",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "right",
+          "toward": "이천"
+        },
+        "bytes": 464879,
+        "sha256": "1b1a37cb32db6e9e15a8c3b76398110f707db81edd5868bc50d62688add11f75"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "1b1a37cb32db6e9e15a8c3b76398110f707db81edd5868bc50d62688add11f75"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "경강선",
+          "left": {
+            "code": "K415",
+            "name": "곤지암",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "K416",
+            "name": "신둔도예촌",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "right": {
+            "code": "K417",
+            "name": "이천",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "right",
+          "toward": "이천"
+        },
+        "sha256": "1b1a37cb32db6e9e15a8c3b76398110f707db81edd5868bc50d62688add11f75"
+      }
+    },
+    {
+      "id": "P71",
+      "split": "development",
+      "source": "https://platfrom.tistory.com/entry/%EC%B4%88%EC%9B%94%EC%97%AD%EA%B2%BD%EA%B8%B0",
+      "article_image_number": 7,
+      "original_size": [
+        5472,
+        3648
+      ],
+      "original_bytes": 6579897,
+      "original_sha256": "c4397ef2c5a27733b5a2bd0ae50921e73111eb939c70be3b92a441c7347bd5cd",
+      "expected": {
+        "group": "three",
+        "line": "경강선",
+        "current": "초월",
+        "left": "경기광주",
+        "right": "곤지암",
+        "arrow": "right",
+        "toward": "곤지암",
+        "note": "K414, 오른쪽 역명 바깥의 흰 화살표"
+      },
+      "photo_before": {
+        "outcome": "input_rejected",
+        "http": 413,
+        "body": {
+          "message": "File too large",
+          "error": "Payload Too Large",
+          "statusCode": 413
+        },
+        "sha256": "c4397ef2c5a27733b5a2bd0ae50921e73111eb939c70be3b92a441c7347bd5cd"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "경강선",
+          "left": {
+            "code": "K413",
+            "name": "경기광주",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "K414",
+            "name": "초월",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "K415",
+            "name": "곤지암",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "right",
+          "toward": "곤지암"
+        },
+        "bytes": 230970,
+        "sha256": "e1944ca6533f984c7300b1a5ac994b7e2359028783a90ad62b68121cecff0cd4"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "layout"
+        },
+        "sha256": "e1944ca6533f984c7300b1a5ac994b7e2359028783a90ad62b68121cecff0cd4"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "경강선",
+          "left": {
+            "code": "K413",
+            "name": "경기광주",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "K414",
+            "name": "초월",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "K415",
+            "name": "곤지암",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "right",
+          "toward": "곤지암"
+        },
+        "sha256": "e1944ca6533f984c7300b1a5ac994b7e2359028783a90ad62b68121cecff0cd4"
+      }
+    },
+    {
+      "id": "P83",
+      "split": "development",
+      "source": "https://platfrom.tistory.com/entry/%EA%B0%95%EB%8F%99%EA%B5%AC%EC%B2%AD%EC%97%AD%EC%84%9C%EC%9A%B8",
+      "article_image_number": 4,
+      "original_size": [
+        5472,
+        3648
+      ],
+      "original_bytes": 7678526,
+      "original_sha256": "37885740dff8a1eb8fb011d4f0f7912ec4dfaaf565072b55aa5090f00d1d1f33",
+      "expected": {
+        "group": "three",
+        "line": "8호선",
+        "current": "강동구청",
+        "left": "천호",
+        "right": "몽촌토성",
+        "arrow": "right",
+        "toward": "몽촌토성",
+        "note": "812, 스크린도어 위 작은 삼각형"
+      },
+      "photo_before": {
+        "outcome": "input_rejected",
+        "http": 413,
+        "body": {
+          "message": "File too large",
+          "error": "Payload Too Large",
+          "statusCode": 413
+        },
+        "sha256": "37885740dff8a1eb8fb011d4f0f7912ec4dfaaf565072b55aa5090f00d1d1f33"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "8호선",
+          "left": {
+            "code": "811",
+            "name": "천호",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "812",
+            "name": "강동구청",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "813",
+            "name": "몽촌토성",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "right",
+          "toward": "몽촌토성"
+        },
+        "bytes": 356731,
+        "sha256": "9e620fa332ef7aed8fda62b732694f6a32f17c549a0c9883ededa69a45e346d9"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "9e620fa332ef7aed8fda62b732694f6a32f17c549a0c9883ededa69a45e346d9"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "8호선",
+          "left": {
+            "code": "811",
+            "name": "천호",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "812",
+            "name": "강동구청",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "813",
+            "name": "몽촌토성",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "right",
+          "toward": "몽촌토성"
+        },
+        "sha256": "9e620fa332ef7aed8fda62b732694f6a32f17c549a0c9883ededa69a45e346d9"
+      }
+    },
+    {
+      "id": "P87",
+      "split": "development",
+      "source": "https://platfrom.tistory.com/entry/%EB%8F%99%EB%91%90%EC%B2%9C%EC%A4%91%EC%95%99%EC%97%AD%EA%B2%BD%EA%B8%B0",
+      "article_image_number": 11,
+      "original_size": [
+        5472,
+        3648
+      ],
+      "original_bytes": 5622308,
+      "original_sha256": "367facb5519dcc5377eabe99199b71dca098e6a5fb66751ecda6505c95f25ab2",
+      "expected": {
+        "group": "tiered",
+        "line": "1호선",
+        "current": "동두천중앙",
+        "left": "보산",
+        "right": "지행",
+        "arrow": "right",
+        "toward": "지행",
+        "note": "103, 현재역 아래 두 역명"
+      },
+      "photo_before": {
+        "outcome": "input_rejected",
+        "http": 400,
+        "body": {
+          "message": "16메가픽셀 이하의 온전한 JPEG 또는 PNG 사진을 선택하세요.",
+          "error": "Bad Request",
+          "statusCode": 400
+        },
+        "sha256": "367facb5519dcc5377eabe99199b71dca098e6a5fb66751ecda6505c95f25ab2"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "bytes": 301387,
+        "sha256": "277f7eeb6fd2c911b2ca3b88d4695d0fc273df81e1e1141a616aee81678f99b6"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "277f7eeb6fd2c911b2ca3b88d4695d0fc273df81e1e1141a616aee81678f99b6"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "277f7eeb6fd2c911b2ca3b88d4695d0fc273df81e1e1141a616aee81678f99b6"
+      }
+    },
+    {
+      "id": "P99",
+      "split": "development",
+      "source": "https://platfrom.tistory.com/entry/%EB%91%94%EC%B4%8C%EB%8F%99%EC%97%AD%EC%84%9C%EC%9A%B8",
+      "article_image_number": 3,
+      "original_size": [
+        5326,
+        3551
+      ],
+      "original_bytes": 673391,
+      "original_sha256": "ec87e443e588e9cb4390cde26c366de717e11273c0f7d230a2f8f16abb4381ab",
+      "expected": {
+        "group": "one",
+        "line": "5호선",
+        "current": "둔촌동",
+        "left": null,
+        "right": null,
+        "arrow": "right",
+        "toward": "강동",
+        "note": "기둥형, 다음 역 하나와 오른쪽 화살표"
+      },
+      "photo_before": {
+        "outcome": "input_rejected",
+        "http": 400,
+        "body": {
+          "message": "16메가픽셀 이하의 온전한 JPEG 또는 PNG 사진을 선택하세요.",
+          "error": "Bad Request",
+          "statusCode": 400
+        },
+        "sha256": "ec87e443e588e9cb4390cde26c366de717e11273c0f7d230a2f8f16abb4381ab"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 381072,
+        "sha256": "ca6f2644bf565fc0a991b0fbb5c92d7d9b95b95a500504b8a7b0627e15424dd2"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "ca6f2644bf565fc0a991b0fbb5c92d7d9b95b95a500504b8a7b0627e15424dd2"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "ca6f2644bf565fc0a991b0fbb5c92d7d9b95b95a500504b8a7b0627e15424dd2"
+      }
+    },
+    {
+      "id": "T178",
+      "split": "development",
+      "source": "https://tjo4183.tistory.com/178",
+      "article_image_number": 5,
+      "original_size": [
+        683,
+        910
+      ],
+      "original_bytes": 187259,
+      "original_sha256": "bd3e6ac65f4475ae505c0a141902284c3cbc9141c60030e9e73d3a30825cbc10",
+      "expected": {
+        "group": "hold",
+        "line": "인천1호선",
+        "current": "귤현",
+        "left": null,
+        "right": null,
+        "arrow": null,
+        "toward": null,
+        "note": "외벽 역명만 보이며 방면 없음"
+      },
+      "photo_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "bd3e6ac65f4475ae505c0a141902284c3cbc9141c60030e9e73d3a30825cbc10"
+      },
+      "photo_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 187259,
+        "sha256": "bd3e6ac65f4475ae505c0a141902284c3cbc9141c60030e9e73d3a30825cbc10"
+      },
+      "scaled_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "e882211176134ae2227a6c5cb175f54039879e17086895e668026e07bffd8f78"
+      },
+      "scaled_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "e882211176134ae2227a6c5cb175f54039879e17086895e668026e07bffd8f78"
+      }
+    },
+    {
+      "id": "T239a",
+      "split": "development",
+      "source": "https://tjo4183.tistory.com/239",
+      "article_image_number": 11,
+      "original_size": [
+        683,
+        512
+      ],
+      "original_bytes": 127607,
+      "original_sha256": "ffbc0c9390a751bc28df0fd5a9868815dce07a9fee76431fbf24d6829fbc879d",
+      "expected": {
+        "group": "one",
+        "line": "2호선",
+        "current": "합정",
+        "left": null,
+        "right": null,
+        "arrow": "right",
+        "toward": "홍대입구",
+        "note": "기둥 아래에 다음 역 하나"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "ffbc0c9390a751bc28df0fd5a9868815dce07a9fee76431fbf24d6829fbc879d"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 127607,
+        "sha256": "ffbc0c9390a751bc28df0fd5a9868815dce07a9fee76431fbf24d6829fbc879d"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "d6174ee32c8b8ca77d01fb4786c5d5a7193f8cdf50e8221267429542443d480d"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "d6174ee32c8b8ca77d01fb4786c5d5a7193f8cdf50e8221267429542443d480d"
+      }
+    },
+    {
+      "id": "T239b",
+      "split": "development",
+      "source": "https://tjo4183.tistory.com/239",
+      "article_image_number": 15,
+      "original_size": [
+        683,
+        512
+      ],
+      "original_bytes": 120371,
+      "original_sha256": "30a227414e2e164ce03584c35ac1bdcb4afc9ed897c5cc4f49ee9c1ab4e782f9",
+      "expected": {
+        "group": "one",
+        "line": "6호선",
+        "current": "합정",
+        "left": null,
+        "right": null,
+        "arrow": "right",
+        "toward": "상수",
+        "note": "기둥 아래에 다음 역 하나"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "30a227414e2e164ce03584c35ac1bdcb4afc9ed897c5cc4f49ee9c1ab4e782f9"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 120371,
+        "sha256": "30a227414e2e164ce03584c35ac1bdcb4afc9ed897c5cc4f49ee9c1ab4e782f9"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "96f6fade195071aa38d9c3d6d919872fc18d21de6a78506d644c78c19bb3a32a"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "96f6fade195071aa38d9c3d6d919872fc18d21de6a78506d644c78c19bb3a32a"
+      }
+    },
+    {
+      "id": "T475",
+      "split": "development",
+      "source": "https://tjo4183.tistory.com/475",
+      "article_image_number": 8,
+      "original_size": [
+        820,
+        1093
+      ],
+      "original_bytes": 347167,
+      "original_sha256": "5973cb7603b3628367c76b22c31c618f6a594a4f5a117ee02838e20bf6f85c7d",
+      "expected": {
+        "group": "hold",
+        "line": "4호선",
+        "current": "고잔",
+        "left": null,
+        "right": null,
+        "arrow": null,
+        "toward": null,
+        "note": "기둥의 세로 역명만 있음"
+      },
+      "photo_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "5973cb7603b3628367c76b22c31c618f6a594a4f5a117ee02838e20bf6f85c7d"
+      },
+      "photo_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 347167,
+        "sha256": "5973cb7603b3628367c76b22c31c618f6a594a4f5a117ee02838e20bf6f85c7d"
+      },
+      "scaled_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "989d154d212b827f7b2f262ee28fc4f34c01ed2eda5800e0b7b8f2f24f640b37"
+      },
+      "scaled_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "989d154d212b827f7b2f262ee28fc4f34c01ed2eda5800e0b7b8f2f24f640b37"
+      }
+    },
+    {
+      "id": "T477",
+      "split": "development",
+      "source": "https://tjo4183.tistory.com/477",
+      "article_image_number": 12,
+      "original_size": [
+        820,
+        615
+      ],
+      "original_bytes": 195736,
+      "original_sha256": "d39aa09a7fba8525fb13b64cfd62b806884ec4ff58c5e2e343209495867a6572",
+      "expected": {
+        "group": "three",
+        "line": "1호선",
+        "current": "성균관대",
+        "left": "의왕",
+        "right": "화서",
+        "arrow": "right",
+        "toward": "화서",
+        "note": "지붕 아래 역명판, P153"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "layout"
+        },
+        "sha256": "d39aa09a7fba8525fb13b64cfd62b806884ec4ff58c5e2e343209495867a6572"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "1호선",
+          "left": {
+            "code": "P152",
+            "name": "의왕",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "P153",
+            "name": "성균관대",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "P154",
+            "name": "화서",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "right",
+          "toward": "화서"
+        },
+        "bytes": 195736,
+        "sha256": "d39aa09a7fba8525fb13b64cfd62b806884ec4ff58c5e2e343209495867a6572"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "layout"
+        },
+        "sha256": "8200c61cdbeb5b2f42453bfea11c26947e461edc4b16ebcbc43ce9f8d5cdda19"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "1호선",
+          "left": {
+            "code": "P152",
+            "name": "의왕",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "P153",
+            "name": "성균관대",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "P154",
+            "name": "화서",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "right",
+          "toward": "화서"
+        },
+        "sha256": "8200c61cdbeb5b2f42453bfea11c26947e461edc4b16ebcbc43ce9f8d5cdda19"
+      }
+    },
+    {
+      "id": "T531",
+      "split": "development",
+      "source": "https://tjo4183.tistory.com/531",
+      "article_image_number": 12,
+      "original_size": [
+        4000,
+        2667
+      ],
+      "original_bytes": 4616226,
+      "original_sha256": "67a7c6498cd8b0eea211860909a87ac6365a812722c47c3e5b8c6982c8397e32",
+      "expected": {
+        "group": "hold",
+        "line": "중부내륙선",
+        "current": "부발",
+        "left": null,
+        "right": null,
+        "arrow": "right",
+        "toward": "가남",
+        "note": "지원 노선 밖 중부내륙선, 경강선 판정은 오답"
+      },
+      "photo_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "67a7c6498cd8b0eea211860909a87ac6365a812722c47c3e5b8c6982c8397e32"
+      },
+      "photo_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 4616226,
+        "sha256": "67a7c6498cd8b0eea211860909a87ac6365a812722c47c3e5b8c6982c8397e32"
+      },
+      "scaled_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "d7a6f03bb9e7e2b9e561b18809e1d562c7a756dbd0e86ded64ddf3304d87cb5b"
+      },
+      "scaled_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "d7a6f03bb9e7e2b9e561b18809e1d562c7a756dbd0e86ded64ddf3304d87cb5b"
+      }
+    },
+    {
+      "id": "T548",
+      "split": "development",
+      "source": "https://tjo4183.tistory.com/548",
+      "article_image_number": 11,
+      "original_size": [
+        2250,
+        3000
+      ],
+      "original_bytes": 7361913,
+      "original_sha256": "d6e3d26434fc8cb26a301292cbeef95147006ada63ffb147be8e47bb807a081a",
+      "expected": {
+        "group": "hold",
+        "line": "경의중앙선",
+        "current": "운길산",
+        "left": null,
+        "right": null,
+        "arrow": null,
+        "toward": null,
+        "note": "기둥의 세로 역명만 있음"
+      },
+      "photo_before": {
+        "outcome": "input_rejected",
+        "http": 413,
+        "body": {
+          "message": "File too large",
+          "error": "Payload Too Large",
+          "statusCode": 413
+        },
+        "sha256": "d6e3d26434fc8cb26a301292cbeef95147006ada63ffb147be8e47bb807a081a"
+      },
+      "photo_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 409423,
+        "sha256": "e2a8e7f5d020c0f009ce444d68e1e894b69fa2846f6356edb0f267d2248464c7"
+      },
+      "scaled_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "e2a8e7f5d020c0f009ce444d68e1e894b69fa2846f6356edb0f267d2248464c7"
+      },
+      "scaled_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "e2a8e7f5d020c0f009ce444d68e1e894b69fa2846f6356edb0f267d2248464c7"
+      }
+    },
+    {
+      "id": "T549",
+      "split": "development",
+      "source": "https://tjo4183.tistory.com/549",
+      "article_image_number": 6,
+      "original_size": [
+        3024,
+        4032
+      ],
+      "original_bytes": 804401,
+      "original_sha256": "4be7bf6f08fbda981abc4edf61f7153c2935edacb6cb45ab761babe4e78bae80",
+      "expected": {
+        "group": "one",
+        "line": "공항철도",
+        "current": "청라국제도시",
+        "left": null,
+        "right": null,
+        "arrow": "left",
+        "toward": "영종",
+        "note": "기둥 아래 다음 역과 인천국제공항 방면 표시"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "4be7bf6f08fbda981abc4edf61f7153c2935edacb6cb45ab761babe4e78bae80"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 804401,
+        "sha256": "4be7bf6f08fbda981abc4edf61f7153c2935edacb6cb45ab761babe4e78bae80"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "a1ad402d0a47ac05abc76777e2feca8ac5e9a2458154b71ce298b3d75d56e452"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "a1ad402d0a47ac05abc76777e2feca8ac5e9a2458154b71ce298b3d75d56e452"
+      }
+    },
+    {
+      "id": "T550",
+      "split": "development",
+      "source": "https://tjo4183.tistory.com/550",
+      "article_image_number": 7,
+      "original_size": [
+        4032,
+        3024
+      ],
+      "original_bytes": 464657,
+      "original_sha256": "1b4630908a40210893f284dbe36d0ee517844a32fe0f87f1ff40852829298c13",
+      "expected": {
+        "group": "one",
+        "line": "5호선",
+        "current": "하남검단산",
+        "left": null,
+        "right": null,
+        "arrow": "right",
+        "toward": "하남시청",
+        "note": "종점, 한쪽 역만 표시"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "1b4630908a40210893f284dbe36d0ee517844a32fe0f87f1ff40852829298c13"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 464657,
+        "sha256": "1b4630908a40210893f284dbe36d0ee517844a32fe0f87f1ff40852829298c13"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "0cf356cf948fb081e675a8374781aa22f9e991235d56a709a8f4f28a387de7a8"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "0cf356cf948fb081e675a8374781aa22f9e991235d56a709a8f4f28a387de7a8"
+      }
+    },
+    {
+      "id": "T552",
+      "split": "development",
+      "source": "https://tjo4183.tistory.com/552",
+      "article_image_number": 9,
+      "original_size": [
+        3000,
+        2250
+      ],
+      "original_bytes": 4845223,
+      "original_sha256": "a36dbd2319a17d4d90ce2939d4fa5da5c0af92e7ed6436c6cb33751b0a00611c",
+      "expected": {
+        "group": "three",
+        "line": "경춘선",
+        "current": "마석",
+        "left": "천마산",
+        "right": "대성리",
+        "arrow": "left",
+        "toward": "천마산",
+        "note": "P130, 스크린도어 위 왼쪽 화살표"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "경춘선",
+          "left": {
+            "code": "P129",
+            "name": "천마산",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "P130",
+            "name": "마석",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "P131",
+            "name": "대성리",
+            "nameRead": true,
+            "codeRead": true
+          }
+        },
+        "sha256": "a36dbd2319a17d4d90ce2939d4fa5da5c0af92e7ed6436c6cb33751b0a00611c"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "경춘선",
+          "left": {
+            "code": "P129",
+            "name": "천마산",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "P130",
+            "name": "마석",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "P131",
+            "name": "대성리",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "arrow": "left",
+          "toward": "천마산"
+        },
+        "bytes": 4845223,
+        "sha256": "a36dbd2319a17d4d90ce2939d4fa5da5c0af92e7ed6436c6cb33751b0a00611c"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "경춘선",
+          "left": {
+            "code": "P129",
+            "name": "천마산",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "P130",
+            "name": "마석",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "P131",
+            "name": "대성리",
+            "nameRead": true,
+            "codeRead": true
+          }
+        },
+        "sha256": "e28c07aeb83ccaa8e22699d44f4cbed2430385958e632e6ae21b9d3cda92573a"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "경춘선",
+          "left": {
+            "code": "P129",
+            "name": "천마산",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "P130",
+            "name": "마석",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "P131",
+            "name": "대성리",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "arrow": "left",
+          "toward": "천마산"
+        },
+        "sha256": "e28c07aeb83ccaa8e22699d44f4cbed2430385958e632e6ae21b9d3cda92573a"
+      }
+    },
+    {
+      "id": "T554",
+      "split": "development",
+      "source": "https://tjo4183.tistory.com/554",
+      "article_image_number": 10,
+      "original_size": [
+        2932,
+        2199
+      ],
+      "original_bytes": 6922933,
+      "original_sha256": "dad8eeea2bf05e906f27bdc132c3179f0205751ae4ab8e03268e63549d71ae07",
+      "expected": {
+        "group": "one",
+        "line": "경강선",
+        "current": "여주",
+        "left": null,
+        "right": null,
+        "arrow": "right",
+        "toward": "세종대왕릉",
+        "note": "종점, 한쪽 역만 표시"
+      },
+      "photo_before": {
+        "outcome": "input_rejected",
+        "http": 413,
+        "body": {
+          "message": "File too large",
+          "error": "Payload Too Large",
+          "statusCode": 413
+        },
+        "sha256": "dad8eeea2bf05e906f27bdc132c3179f0205751ae4ab8e03268e63549d71ae07"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "bytes": 357920,
+        "sha256": "b18179c4bff8d94b95461168fb04c4acad31bb87eff8759fecb50f9e07158b67"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "b18179c4bff8d94b95461168fb04c4acad31bb87eff8759fecb50f9e07158b67"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "b18179c4bff8d94b95461168fb04c4acad31bb87eff8759fecb50f9e07158b67"
+      }
+    },
+    {
+      "id": "W320",
+      "split": "development",
+      "source": "https://wmiraew.tistory.com/320",
+      "article_image_number": 14,
+      "original_size": [
+        4000,
+        3000
+      ],
+      "original_bytes": 5141991,
+      "original_sha256": "78ab9daf46f96924149b78dd76017215bcc5f43b758b083f915e6559e3822149",
+      "expected": {
+        "group": "three",
+        "line": "서해선",
+        "current": "초지",
+        "left": "선부",
+        "right": "시우",
+        "arrow": "right",
+        "toward": "시우",
+        "note": "S26, 개발용 좌향 사진과 다른 촬영본"
+      },
+      "photo_before": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "서해선",
+          "left": {
+            "code": "S25",
+            "name": "선부",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "S26",
+            "name": "초지",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "S27",
+            "name": "시우",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "arrow": "right",
+          "toward": "시우"
+        },
+        "sha256": "78ab9daf46f96924149b78dd76017215bcc5f43b758b083f915e6559e3822149"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "서해선",
+          "left": {
+            "code": "S25",
+            "name": "선부",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "S26",
+            "name": "초지",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "S27",
+            "name": "시우",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "arrow": "right",
+          "toward": "시우"
+        },
+        "bytes": 5141991,
+        "sha256": "78ab9daf46f96924149b78dd76017215bcc5f43b758b083f915e6559e3822149"
+      },
+      "scaled_before": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "서해선",
+          "left": {
+            "code": "S25",
+            "name": "선부",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "S26",
+            "name": "초지",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "S27",
+            "name": "시우",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "arrow": "right",
+          "toward": "시우"
+        },
+        "sha256": "5312adb40207442033a9f409a8228959383dc022adfc6433a52e018d5ca11065"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "서해선",
+          "left": {
+            "code": "S25",
+            "name": "선부",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "S26",
+            "name": "초지",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "S27",
+            "name": "시우",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "arrow": "right",
+          "toward": "시우"
+        },
+        "sha256": "5312adb40207442033a9f409a8228959383dc022adfc6433a52e018d5ca11065"
+      }
+    },
+    {
+      "id": "regression-gangnam",
+      "split": "regression",
+      "source": "backend/tests/fixtures/gangnam-sign.jpg",
+      "article_image_number": null,
+      "original_size": [
+        1920,
+        1080
+      ],
+      "original_bytes": 498584,
+      "original_sha256": "6c8cd6a68c6d2ba69c6e887fcfaefb2fdd2857363c4caf12d8986c67acf09634",
+      "expected": {
+        "group": "regression",
+        "line": "2호선",
+        "current": "강남",
+        "left": "교대",
+        "right": "역삼",
+        "arrow": "left",
+        "toward": "교대"
+      },
+      "photo_before": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "2호선",
+          "left": {
+            "code": "223",
+            "name": "교대",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "222",
+            "name": "강남",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "221",
+            "name": "역삼",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "교대"
+        },
+        "sha256": "6c8cd6a68c6d2ba69c6e887fcfaefb2fdd2857363c4caf12d8986c67acf09634"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "2호선",
+          "left": {
+            "code": "223",
+            "name": "교대",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "222",
+            "name": "강남",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "221",
+            "name": "역삼",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "교대"
+        },
+        "bytes": 498584,
+        "sha256": "6c8cd6a68c6d2ba69c6e887fcfaefb2fdd2857363c4caf12d8986c67acf09634"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "direction_conflict"
+        },
+        "sha256": "5645fb0afb10ebfed040a4c8b84c97244f393b5415bad08f430f65f095e90395"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "2호선",
+          "left": {
+            "code": "223",
+            "name": "교대",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "222",
+            "name": "강남",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "221",
+            "name": "역삼",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "교대"
+        },
+        "sha256": "5645fb0afb10ebfed040a4c8b84c97244f393b5415bad08f430f65f095e90395"
+      }
+    },
+    {
+      "id": "regression-choji",
+      "split": "regression",
+      "source": "experiments/corridor/ChatGPT Image Nov 20, 2026, 07_10_17 PM.png",
+      "article_image_number": null,
+      "original_size": [
+        1116,
+        270
+      ],
+      "original_bytes": 162885,
+      "original_sha256": "50fa15dbf22dcb9d9119e350421e0901eaaba0f61923aa0c52467f67ff032a56",
+      "expected": {
+        "group": "regression",
+        "line": "서해선",
+        "current": "초지",
+        "left": "선부",
+        "right": "시우",
+        "arrow": "left",
+        "toward": "선부"
+      },
+      "photo_before": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "서해선",
+          "left": {
+            "code": "S25",
+            "name": "선부",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "S26",
+            "name": "초지",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "S27",
+            "name": "시우",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "선부"
+        },
+        "sha256": "50fa15dbf22dcb9d9119e350421e0901eaaba0f61923aa0c52467f67ff032a56"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "서해선",
+          "left": {
+            "code": "S25",
+            "name": "선부",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "S26",
+            "name": "초지",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "S27",
+            "name": "시우",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "선부"
+        },
+        "bytes": 162885,
+        "sha256": "50fa15dbf22dcb9d9119e350421e0901eaaba0f61923aa0c52467f67ff032a56"
+      },
+      "scaled_before": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "서해선",
+          "left": {
+            "code": "S25",
+            "name": "선부",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "S26",
+            "name": "초지",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "S27",
+            "name": "시우",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "선부"
+        },
+        "sha256": "3e70505335a50acd1e246247ebdbe94deb2d7f6fdbbc3746a19d97262c7a3ff7"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "서해선",
+          "left": {
+            "code": "S25",
+            "name": "선부",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "S26",
+            "name": "초지",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "S27",
+            "name": "시우",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "선부"
+        },
+        "sha256": "3e70505335a50acd1e246247ebdbe94deb2d7f6fdbbc3746a19d97262c7a3ff7"
+      }
+    },
+    {
+      "id": "H00",
+      "split": "diagnostic",
+      "source": "https://platfrom.tistory.com/entry/%EB%8F%84%EB%A6%BC%EC%B2%9C%EC%97%AD%EC%84%9C%EC%9A%B8",
+      "article_image_number": 2,
+      "original_size": [
+        3000,
+        2000
+      ],
+      "original_bytes": 801612,
+      "original_sha256": "d8702240b2c40c62121ac3128e40e3ef00701c1052404312820a1bdf59321d3b",
+      "expected": {
+        "group": "hold",
+        "line": "2호선",
+        "current": "도림천",
+        "left": "신도림",
+        "right": "양천구청",
+        "arrow": null,
+        "toward": null,
+        "note": ""
+      },
+      "photo_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "layout"
+        },
+        "sha256": "d8702240b2c40c62121ac3128e40e3ef00701c1052404312820a1bdf59321d3b"
+      },
+      "photo_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "2호선",
+          "left": {
+            "code": "234",
+            "name": "신도림",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "234-1",
+            "name": "도림천",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "234-2",
+            "name": "양천구청",
+            "nameRead": true,
+            "codeRead": false
+          }
+        },
+        "bytes": 801612,
+        "sha256": "d8702240b2c40c62121ac3128e40e3ef00701c1052404312820a1bdf59321d3b"
+      },
+      "scaled_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "layout"
+        },
+        "sha256": "dc9c4b260959a72dadb14fab24482a421cd00fb90bbbf9be610f6a7196b40bb7"
+      },
+      "scaled_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "2호선",
+          "left": {
+            "code": "234",
+            "name": "신도림",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "234-1",
+            "name": "도림천",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "234-2",
+            "name": "양천구청",
+            "nameRead": true,
+            "codeRead": false
+          }
+        },
+        "sha256": "dc9c4b260959a72dadb14fab24482a421cd00fb90bbbf9be610f6a7196b40bb7"
+      }
+    },
+    {
+      "id": "H02",
+      "split": "diagnostic",
+      "source": "https://platfrom.tistory.com/entry/%EC%8B%A0%EC%A0%95%EB%84%A4%EA%B1%B0%EB%A6%AC%EC%97%AD%EC%84%9C%EC%9A%B8",
+      "article_image_number": 12,
+      "original_size": [
+        3000,
+        2000
+      ],
+      "original_bytes": 825659,
+      "original_sha256": "71a83299d13099544221320c2625562b40fb4dd3ff0a80b96833f29cf9fb4370",
+      "expected": {
+        "group": "three",
+        "line": "2호선",
+        "current": "신정네거리",
+        "left": "양천구청",
+        "right": "까치산",
+        "arrow": "left",
+        "toward": "양천구청",
+        "note": ""
+      },
+      "photo_before": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "2호선",
+          "left": {
+            "code": "234-2",
+            "name": "양천구청",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "234-3",
+            "name": "신정네거리",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "234-4",
+            "name": "까치산",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "양천구청"
+        },
+        "sha256": "71a83299d13099544221320c2625562b40fb4dd3ff0a80b96833f29cf9fb4370"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "2호선",
+          "left": {
+            "code": "234-2",
+            "name": "양천구청",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "234-3",
+            "name": "신정네거리",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "234-4",
+            "name": "까치산",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "양천구청"
+        },
+        "bytes": 825659,
+        "sha256": "71a83299d13099544221320c2625562b40fb4dd3ff0a80b96833f29cf9fb4370"
+      },
+      "scaled_before": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "2호선",
+          "left": {
+            "code": "234-2",
+            "name": "양천구청",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "234-3",
+            "name": "신정네거리",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "234-4",
+            "name": "까치산",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "양천구청"
+        },
+        "sha256": "b56b1cbfd2628693ee1993b485382ea61e37b8fcb81a1100e0711ddbb898f761"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "2호선",
+          "left": {
+            "code": "234-2",
+            "name": "양천구청",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "234-3",
+            "name": "신정네거리",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "234-4",
+            "name": "까치산",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "양천구청"
+        },
+        "sha256": "b56b1cbfd2628693ee1993b485382ea61e37b8fcb81a1100e0711ddbb898f761"
+      }
+    },
+    {
+      "id": "H06",
+      "split": "diagnostic",
+      "source": "https://platfrom.tistory.com/entry/%EB%B0%9C%EC%82%B0%EC%97%AD%EC%84%9C%EC%9A%B8",
+      "article_image_number": 3,
+      "original_size": [
+        3000,
+        2000
+      ],
+      "original_bytes": 620086,
+      "original_sha256": "8bf994d87c37ce0c96efc85f15b74dc30bb80a794f5a558261fd091f6bea5ee5",
+      "expected": {
+        "group": "three",
+        "line": "5호선",
+        "current": "발산",
+        "left": "우장산",
+        "right": "마곡",
+        "arrow": "left",
+        "toward": "우장산",
+        "note": ""
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "8bf994d87c37ce0c96efc85f15b74dc30bb80a794f5a558261fd091f6bea5ee5"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 620086,
+        "sha256": "8bf994d87c37ce0c96efc85f15b74dc30bb80a794f5a558261fd091f6bea5ee5"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "8c79593a93ba90fd2e50dd19792255c3d18a8da5e1c5ff6f0fbbd44088a0d7ea"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "8c79593a93ba90fd2e50dd19792255c3d18a8da5e1c5ff6f0fbbd44088a0d7ea"
+      }
+    },
+    {
+      "id": "H14",
+      "split": "diagnostic",
+      "source": "https://platfrom.tistory.com/entry/%EA%B3%B5%ED%95%AD%EC%8B%9C%EC%9E%A5%EC%97%AD%EC%84%9C%EC%9A%B8",
+      "article_image_number": 14,
+      "original_size": [
+        3000,
+        2000
+      ],
+      "original_bytes": 635061,
+      "original_sha256": "7e5c17ba3d0e5ab0e15e2a6beae3d8ef770a8e104dda3da9662009f9c2656635",
+      "expected": {
+        "group": "tiered",
+        "line": "9호선",
+        "current": "공항시장",
+        "left": "김포공항",
+        "right": "신방화",
+        "arrow": "left",
+        "toward": "김포공항",
+        "note": ""
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "layout"
+        },
+        "sha256": "7e5c17ba3d0e5ab0e15e2a6beae3d8ef770a8e104dda3da9662009f9c2656635"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "9호선",
+          "left": {
+            "code": "902",
+            "name": "김포공항",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "903",
+            "name": "공항시장",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "904",
+            "name": "신방화",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "김포공항"
+        },
+        "bytes": 635061,
+        "sha256": "7e5c17ba3d0e5ab0e15e2a6beae3d8ef770a8e104dda3da9662009f9c2656635"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "layout"
+        },
+        "sha256": "21f80fdd40846835460a041d617d0d5da427374f88a66d8aaaefcc9e1e0f926a"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "9호선",
+          "left": {
+            "code": "902",
+            "name": "김포공항",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "903",
+            "name": "공항시장",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "904",
+            "name": "신방화",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "김포공항"
+        },
+        "sha256": "21f80fdd40846835460a041d617d0d5da427374f88a66d8aaaefcc9e1e0f926a"
+      }
+    },
+    {
+      "id": "H18",
+      "split": "diagnostic",
+      "source": "https://platfrom.tistory.com/entry/%EA%B0%80%EC%96%91%EC%97%AD%EC%84%9C%EC%9A%B8",
+      "article_image_number": 23,
+      "original_size": [
+        2000,
+        1333
+      ],
+      "original_bytes": 253594,
+      "original_sha256": "f6627e04d654eaf57d6beb63c11dd9f26df2d146e40268de35780e6198c81d02",
+      "expected": {
+        "group": "tiered",
+        "line": "9호선",
+        "current": "가양",
+        "left": "증미",
+        "right": "양천향교",
+        "arrow": "right",
+        "toward": "양천향교",
+        "note": ""
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "layout"
+        },
+        "sha256": "f6627e04d654eaf57d6beb63c11dd9f26df2d146e40268de35780e6198c81d02"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "layout"
+        },
+        "bytes": 253594,
+        "sha256": "f6627e04d654eaf57d6beb63c11dd9f26df2d146e40268de35780e6198c81d02"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "4b774989aa3bf043609d0a2a39b81ee400f9005226d4e2389fb05890e710ba1e"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "9호선",
+          "left": {
+            "code": "908",
+            "name": "증미",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "907",
+            "name": "가양",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "906",
+            "name": "양천향교",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "right",
+          "toward": "양천향교"
+        },
+        "sha256": "4b774989aa3bf043609d0a2a39b81ee400f9005226d4e2389fb05890e710ba1e"
+      }
+    },
+    {
+      "id": "H24",
+      "split": "diagnostic",
+      "source": "https://platfrom.tistory.com/entry/%EB%8B%B9%EC%82%B0%EC%97%AD%EC%84%9C%EC%9A%B8",
+      "article_image_number": 10,
+      "original_size": [
+        2000,
+        1333
+      ],
+      "original_bytes": 278431,
+      "original_sha256": "7a004bd18f2da1c0f5ef524c425903c0775716a656196bd16bd9f24742bba482",
+      "expected": {
+        "group": "three",
+        "line": "2호선",
+        "current": "당산",
+        "left": "영등포구청",
+        "right": "합정",
+        "arrow": "left",
+        "toward": "영등포구청",
+        "note": ""
+      },
+      "photo_before": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "2호선",
+          "left": {
+            "code": "236",
+            "name": "영등포구청",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "237",
+            "name": "당산",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "238",
+            "name": "합정",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "영등포구청"
+        },
+        "sha256": "7a004bd18f2da1c0f5ef524c425903c0775716a656196bd16bd9f24742bba482"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "2호선",
+          "left": {
+            "code": "236",
+            "name": "영등포구청",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "237",
+            "name": "당산",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "238",
+            "name": "합정",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "영등포구청"
+        },
+        "bytes": 278431,
+        "sha256": "7a004bd18f2da1c0f5ef524c425903c0775716a656196bd16bd9f24742bba482"
+      },
+      "scaled_before": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "2호선",
+          "left": {
+            "code": "236",
+            "name": "영등포구청",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "237",
+            "name": "당산",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "238",
+            "name": "합정",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "영등포구청"
+        },
+        "sha256": "f2f6cf05cefbbd60828b7e9cf0424c51e66c8854e431e40a08ada92e72cb91fe"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "2호선",
+          "left": {
+            "code": "236",
+            "name": "영등포구청",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "237",
+            "name": "당산",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "238",
+            "name": "합정",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "영등포구청"
+        },
+        "sha256": "f2f6cf05cefbbd60828b7e9cf0424c51e66c8854e431e40a08ada92e72cb91fe"
+      }
+    },
+    {
+      "id": "H32",
+      "split": "diagnostic",
+      "source": "https://platfrom.tistory.com/entry/%EC%9D%B8%ED%95%98%EB%8C%80%EC%97%AD%EC%9D%B8%EC%B2%9C",
+      "article_image_number": 2,
+      "original_size": [
+        1500,
+        1000
+      ],
+      "original_bytes": 831923,
+      "original_sha256": "52569d1bf13bd8d49491a6a089c3ede82aff4cbfc35ebf1ea2bbdcc0cbd09260",
+      "expected": {
+        "group": "tiered",
+        "line": "수인분당선",
+        "current": "인하대",
+        "left": "송도",
+        "right": "숭의",
+        "arrow": "right",
+        "toward": "숭의",
+        "note": "촬영 당시 수인선"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "52569d1bf13bd8d49491a6a089c3ede82aff4cbfc35ebf1ea2bbdcc0cbd09260"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "bytes": 831923,
+        "sha256": "52569d1bf13bd8d49491a6a089c3ede82aff4cbfc35ebf1ea2bbdcc0cbd09260"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "b6f253710485ce80f44e0256c89dab6e0f60bbd25d787b1e3b948b7214e43834"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "b6f253710485ce80f44e0256c89dab6e0f60bbd25d787b1e3b948b7214e43834"
+      }
+    },
+    {
+      "id": "H36",
+      "split": "diagnostic",
+      "source": "https://platfrom.tistory.com/entry/%EB%82%A8%EB%8F%99%EC%9D%B8%EB%8D%94%EC%8A%A4%ED%8C%8C%ED%81%AC%EC%97%AD%EC%9D%B8%EC%B2%9C",
+      "article_image_number": 5,
+      "original_size": [
+        1500,
+        1000
+      ],
+      "original_bytes": 1208459,
+      "original_sha256": "2e1f61149385b268b25b79a1b07345116ace5c5a1f538ae5dd406df9f161d0aa",
+      "expected": {
+        "group": "three",
+        "line": "수인분당선",
+        "current": "남동인더스파크",
+        "left": "호구포",
+        "right": "원인재",
+        "arrow": "right",
+        "toward": "원인재",
+        "note": "촬영 당시 수인선"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "2e1f61149385b268b25b79a1b07345116ace5c5a1f538ae5dd406df9f161d0aa"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 1208459,
+        "sha256": "2e1f61149385b268b25b79a1b07345116ace5c5a1f538ae5dd406df9f161d0aa"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "bc730e931809724a80c86f84100ae83a5c4c5f462543e222f09358d063a27f5c"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "bc730e931809724a80c86f84100ae83a5c4c5f462543e222f09358d063a27f5c"
+      }
+    },
+    {
+      "id": "H41",
+      "split": "diagnostic",
+      "source": "https://platfrom.tistory.com/entry/%EB%8B%AC%EC%9B%94%EC%97%AD%EA%B2%BD%EA%B8%B0",
+      "article_image_number": 4,
+      "original_size": [
+        1500,
+        1000
+      ],
+      "original_bytes": 949349,
+      "original_sha256": "07799fbf89851c636bd0277c4064159e2975a0c998f01c061fdc01d775e7605f",
+      "expected": {
+        "group": "three",
+        "line": "수인분당선",
+        "current": "달월",
+        "left": "오이도",
+        "right": "월곶",
+        "arrow": "right",
+        "toward": "월곶",
+        "note": "촬영 당시 수인선"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "07799fbf89851c636bd0277c4064159e2975a0c998f01c061fdc01d775e7605f"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "bytes": 949349,
+        "sha256": "07799fbf89851c636bd0277c4064159e2975a0c998f01c061fdc01d775e7605f"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "31dd89fc169fb233b805649cd2debe2e48ede6752968012cbdbff6796dda2b0d"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "31dd89fc169fb233b805649cd2debe2e48ede6752968012cbdbff6796dda2b0d"
+      }
+    },
+    {
+      "id": "H43",
+      "split": "diagnostic",
+      "source": "https://platfrom.tistory.com/entry/%EC%A0%95%EC%99%95%EC%97%AD%EA%B2%BD%EA%B8%B0",
+      "article_image_number": 2,
+      "original_size": [
+        1500,
+        1000
+      ],
+      "original_bytes": 1259791,
+      "original_sha256": "f81518cb23c4860f38325032c2fae329e1b3981aafa5f13b5b37df160490b502",
+      "expected": {
+        "group": "faint",
+        "line": "4호선",
+        "current": "정왕",
+        "left": "오이도",
+        "right": null,
+        "arrow": "left",
+        "toward": "오이도",
+        "note": "먼 쪽 이웃 역명이 어두움"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "f81518cb23c4860f38325032c2fae329e1b3981aafa5f13b5b37df160490b502"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 1259791,
+        "sha256": "f81518cb23c4860f38325032c2fae329e1b3981aafa5f13b5b37df160490b502"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "f3ab58354b5643cdc68423f7d946cbfeac3f1219d27ff942994d8f2aa0a451a6"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "f3ab58354b5643cdc68423f7d946cbfeac3f1219d27ff942994d8f2aa0a451a6"
+      }
+    },
+    {
+      "id": "H45",
+      "split": "diagnostic",
+      "source": "https://platfrom.tistory.com/entry/%EC%95%88%EC%82%B0%EC%97%AD%EA%B2%BD%EA%B8%B0",
+      "article_image_number": 4,
+      "original_size": [
+        1500,
+        1000
+      ],
+      "original_bytes": 1099738,
+      "original_sha256": "aea7f11160ad5723a94a9b2c6334c9fea57ca20ca03f68b7c17d1e3358de8173",
+      "expected": {
+        "group": "faint",
+        "line": "4호선",
+        "current": "안산",
+        "left": "신길온천",
+        "right": null,
+        "arrow": "left",
+        "toward": "신길온천",
+        "note": "먼 쪽 이웃 역명이 어두움"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "aea7f11160ad5723a94a9b2c6334c9fea57ca20ca03f68b7c17d1e3358de8173"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 1099738,
+        "sha256": "aea7f11160ad5723a94a9b2c6334c9fea57ca20ca03f68b7c17d1e3358de8173"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "7705c66dd564d7166d9e64d24cc58c2d4dec09bf39003178b73f7c48094c9874"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "7705c66dd564d7166d9e64d24cc58c2d4dec09bf39003178b73f7c48094c9874"
+      }
+    },
+    {
+      "id": "H47",
+      "split": "diagnostic",
+      "source": "https://platfrom.tistory.com/entry/%EA%B3%A0%EC%9E%94%EC%97%AD%EA%B2%BD%EA%B8%B0",
+      "article_image_number": 4,
+      "original_size": [
+        1500,
+        1000
+      ],
+      "original_bytes": 1276852,
+      "original_sha256": "07e070ca3680b50e2e0c12e9c84c8f53000f2a853ebbf05ba3b6cc3447f4e63f",
+      "expected": {
+        "group": "three",
+        "line": "4호선",
+        "current": "고잔",
+        "left": "초지",
+        "right": "중앙",
+        "arrow": "left",
+        "toward": "초지",
+        "note": "전경의 가장 큰 판, 뒤쪽 승강장에도 작은 판이 있음"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "07e070ca3680b50e2e0c12e9c84c8f53000f2a853ebbf05ba3b6cc3447f4e63f"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "4호선",
+          "left": {
+            "code": "452",
+            "name": "초지",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "451",
+            "name": "고잔",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "450",
+            "name": "중앙",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "arrow": "left",
+          "toward": "초지"
+        },
+        "bytes": 1276852,
+        "sha256": "07e070ca3680b50e2e0c12e9c84c8f53000f2a853ebbf05ba3b6cc3447f4e63f"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "8cc62eca07daf208497cf34a778af819c0ddb0807ee9c61038517a0a1d4a174e"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "4호선",
+          "left": {
+            "code": "452",
+            "name": "초지",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "451",
+            "name": "고잔",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "450",
+            "name": "중앙",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "arrow": "left",
+          "toward": "초지"
+        },
+        "sha256": "8cc62eca07daf208497cf34a778af819c0ddb0807ee9c61038517a0a1d4a174e"
+      }
+    },
+    {
+      "id": "H48",
+      "split": "diagnostic",
+      "source": "https://platfrom.tistory.com/entry/%EC%A4%91%EC%95%99%EC%97%AD%EA%B2%BD%EA%B8%B0",
+      "article_image_number": 5,
+      "original_size": [
+        1500,
+        1000
+      ],
+      "original_bytes": 1170683,
+      "original_sha256": "3b3b5147c9eaedb470a0eb47148541ad4a62252b43a2610b96d35ac3f477e30c",
+      "expected": {
+        "group": "three",
+        "line": "4호선",
+        "current": "중앙",
+        "left": "고잔",
+        "right": "한대앞",
+        "arrow": "left",
+        "toward": "고잔",
+        "note": ""
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "4호선",
+          "left": {
+            "code": "451",
+            "name": "고잔",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "450",
+            "name": "중앙",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "449",
+            "name": "한대앞",
+            "nameRead": true,
+            "codeRead": false
+          }
+        },
+        "sha256": "3b3b5147c9eaedb470a0eb47148541ad4a62252b43a2610b96d35ac3f477e30c"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "4호선",
+          "left": {
+            "code": "451",
+            "name": "고잔",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "450",
+            "name": "중앙",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "449",
+            "name": "한대앞",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "고잔"
+        },
+        "bytes": 1170683,
+        "sha256": "3b3b5147c9eaedb470a0eb47148541ad4a62252b43a2610b96d35ac3f477e30c"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "54936a4770e3aab7647a2c3b570454bfde07449e50be848ac5b1817e0c7f5c33"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "4호선",
+          "left": {
+            "code": "451",
+            "name": "고잔",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "450",
+            "name": "중앙",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "449",
+            "name": "한대앞",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "고잔"
+        },
+        "sha256": "54936a4770e3aab7647a2c3b570454bfde07449e50be848ac5b1817e0c7f5c33"
+      }
+    },
+    {
+      "id": "H53",
+      "split": "diagnostic",
+      "source": "https://platfrom.tistory.com/entry/%EB%8C%80%EC%95%BC%EB%AF%B8%EC%97%AD%EA%B2%BD%EA%B8%B0",
+      "article_image_number": 14,
+      "original_size": [
+        1500,
+        1000
+      ],
+      "original_bytes": 879600,
+      "original_sha256": "9283ef853a9bc49da33c35ac0bc6f2535a9d5dbbea75877ab017f0d9a348f796",
+      "expected": {
+        "group": "hold",
+        "line": "4호선",
+        "current": "대야미",
+        "left": null,
+        "right": null,
+        "arrow": null,
+        "toward": null,
+        "note": "역 외관, 승강장 안내판 없음"
+      },
+      "photo_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "9283ef853a9bc49da33c35ac0bc6f2535a9d5dbbea75877ab017f0d9a348f796"
+      },
+      "photo_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 879600,
+        "sha256": "9283ef853a9bc49da33c35ac0bc6f2535a9d5dbbea75877ab017f0d9a348f796"
+      },
+      "scaled_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "8a38b4c4694055f44f69bb5c899cebea93e1c41ed2077600f33bfedaa090dbbe"
+      },
+      "scaled_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "8a38b4c4694055f44f69bb5c899cebea93e1c41ed2077600f33bfedaa090dbbe"
+      }
+    },
+    {
+      "id": "H65",
+      "split": "diagnostic",
+      "source": "https://platfrom.tistory.com/entry/%EC%9D%B4%EB%A7%A4%EC%97%AD%EA%B2%BD%EA%B8%B0",
+      "article_image_number": 8,
+      "original_size": [
+        5472,
+        3648
+      ],
+      "original_bytes": 6704936,
+      "original_sha256": "66c13b3128f4ab16b9588eefb3418727d59fb07e73a051e268ee12c442081518",
+      "expected": {
+        "group": "three",
+        "line": "수인분당선",
+        "current": "이매",
+        "left": "야탑",
+        "right": "서현",
+        "arrow": "right",
+        "toward": "서현",
+        "note": "촬영 당시 분당선"
+      },
+      "photo_before": {
+        "outcome": "input_rejected",
+        "http": 413,
+        "body": {
+          "message": "File too large",
+          "error": "Payload Too Large",
+          "statusCode": 413
+        },
+        "sha256": "66c13b3128f4ab16b9588eefb3418727d59fb07e73a051e268ee12c442081518"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "수인분당선",
+          "left": {
+            "code": "K226",
+            "name": "야탑",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "K227",
+            "name": "이매",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "K228",
+            "name": "서현",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "arrow": "right",
+          "toward": "서현"
+        },
+        "bytes": 275725,
+        "sha256": "e3b9502ba740cd7c41c3a951de93649f5eade6aed00599e77b306082af732b68"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "수인분당선",
+          "left": {
+            "code": "K226",
+            "name": "야탑",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "K227",
+            "name": "이매",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "K228",
+            "name": "서현",
+            "nameRead": true,
+            "codeRead": true
+          }
+        },
+        "sha256": "e3b9502ba740cd7c41c3a951de93649f5eade6aed00599e77b306082af732b68"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "수인분당선",
+          "left": {
+            "code": "K226",
+            "name": "야탑",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "K227",
+            "name": "이매",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "K228",
+            "name": "서현",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "arrow": "right",
+          "toward": "서현"
+        },
+        "sha256": "e3b9502ba740cd7c41c3a951de93649f5eade6aed00599e77b306082af732b68"
+      }
+    },
+    {
+      "id": "H68",
+      "split": "diagnostic",
+      "source": "https://platfrom.tistory.com/entry/%EC%9D%B4%EC%B2%9C%EC%97%AD%EA%B2%BD%EA%B8%B0",
+      "article_image_number": 5,
+      "original_size": [
+        5472,
+        3648
+      ],
+      "original_bytes": 6966796,
+      "original_sha256": "f798c842af00d4b2fdd65e10d274dbc90aa50901403a99f40bb5913790c2ffb5",
+      "expected": {
+        "group": "three",
+        "line": "경강선",
+        "current": "이천",
+        "left": "부발",
+        "right": "신둔도예촌",
+        "arrow": "left",
+        "toward": "부발",
+        "note": ""
+      },
+      "photo_before": {
+        "outcome": "input_rejected",
+        "http": 413,
+        "body": {
+          "message": "File too large",
+          "error": "Payload Too Large",
+          "statusCode": 413
+        },
+        "sha256": "f798c842af00d4b2fdd65e10d274dbc90aa50901403a99f40bb5913790c2ffb5"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "경강선",
+          "left": {
+            "code": "K418",
+            "name": "부발",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "K417",
+            "name": "이천",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "K416",
+            "name": "신둔도예촌",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "arrow": "left",
+          "toward": "부발"
+        },
+        "bytes": 450449,
+        "sha256": "e7cb7267c50e9d63795e50b8f9f9f17250bc4adb81ff6d970da63b1efcd6dd97"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "e7cb7267c50e9d63795e50b8f9f9f17250bc4adb81ff6d970da63b1efcd6dd97"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "경강선",
+          "left": {
+            "code": "K418",
+            "name": "부발",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "K417",
+            "name": "이천",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "K416",
+            "name": "신둔도예촌",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "arrow": "left",
+          "toward": "부발"
+        },
+        "sha256": "e7cb7267c50e9d63795e50b8f9f9f17250bc4adb81ff6d970da63b1efcd6dd97"
+      }
+    },
+    {
+      "id": "H85",
+      "split": "diagnostic",
+      "source": "https://platfrom.tistory.com/entry/%EC%B2%9C%ED%98%B8%EC%97%AD%EC%84%9C%EC%9A%B8",
+      "article_image_number": 11,
+      "original_size": [
+        5472,
+        3648
+      ],
+      "original_bytes": 7351660,
+      "original_sha256": "e19bf7e29f6dfff693957a1574a6882143a7968c81659c457d60a188982de263",
+      "expected": {
+        "group": "three",
+        "line": "8호선",
+        "current": "천호",
+        "left": "강동구청",
+        "right": "암사",
+        "arrow": "right",
+        "toward": "암사",
+        "note": ""
+      },
+      "photo_before": {
+        "outcome": "input_rejected",
+        "http": 413,
+        "body": {
+          "message": "File too large",
+          "error": "Payload Too Large",
+          "statusCode": 413
+        },
+        "sha256": "e19bf7e29f6dfff693957a1574a6882143a7968c81659c457d60a188982de263"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "8호선",
+          "left": {
+            "code": "812",
+            "name": "강동구청",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "811",
+            "name": "천호",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "right": {
+            "code": "810",
+            "name": "암사",
+            "nameRead": true,
+            "codeRead": false
+          }
+        },
+        "bytes": 368779,
+        "sha256": "570e0d22b811b09b8ae635fa3c3c42401d337f29f6f4f207fb36f69ad6db35ce"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "8호선",
+          "left": {
+            "code": "812",
+            "name": "강동구청",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "811",
+            "name": "천호",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "right": {
+            "code": "810",
+            "name": "암사",
+            "nameRead": true,
+            "codeRead": false
+          }
+        },
+        "sha256": "570e0d22b811b09b8ae635fa3c3c42401d337f29f6f4f207fb36f69ad6db35ce"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "8호선",
+          "left": {
+            "code": "812",
+            "name": "강동구청",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "811",
+            "name": "천호",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "right": {
+            "code": "810",
+            "name": "암사",
+            "nameRead": true,
+            "codeRead": false
+          }
+        },
+        "sha256": "570e0d22b811b09b8ae635fa3c3c42401d337f29f6f4f207fb36f69ad6db35ce"
+      }
+    },
+    {
+      "id": "H88",
+      "split": "diagnostic",
+      "source": "https://platfrom.tistory.com/entry/%EB%B3%B4%EC%82%B0%EC%97%AD%EA%B2%BD%EA%B8%B0",
+      "article_image_number": 4,
+      "original_size": [
+        5472,
+        3648
+      ],
+      "original_bytes": 7565782,
+      "original_sha256": "8570b752a6dd3cbecdac55ad00ceb5778f3e508f6c2d9cb0918764d2824ab066",
+      "expected": {
+        "group": "three",
+        "line": "1호선",
+        "current": "보산",
+        "left": "동두천",
+        "right": "동두천중앙",
+        "arrow": "right",
+        "toward": "동두천중앙",
+        "note": ""
+      },
+      "photo_before": {
+        "outcome": "input_rejected",
+        "http": 413,
+        "body": {
+          "message": "File too large",
+          "error": "Payload Too Large",
+          "statusCode": 413
+        },
+        "sha256": "8570b752a6dd3cbecdac55ad00ceb5778f3e508f6c2d9cb0918764d2824ab066"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "1호선",
+          "left": {
+            "code": "101",
+            "name": "동두천",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "102",
+            "name": "보산",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "103",
+            "name": "동두천중앙",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "arrow": "right",
+          "toward": "동두천중앙"
+        },
+        "bytes": 402251,
+        "sha256": "ba4eb414e29dcd3b4bff7ad8105424074a5520c7b3c6c596af4a31d762279da7"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "layout"
+        },
+        "sha256": "ba4eb414e29dcd3b4bff7ad8105424074a5520c7b3c6c596af4a31d762279da7"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "1호선",
+          "left": {
+            "code": "101",
+            "name": "동두천",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "102",
+            "name": "보산",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "103",
+            "name": "동두천중앙",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "arrow": "right",
+          "toward": "동두천중앙"
+        },
+        "sha256": "ba4eb414e29dcd3b4bff7ad8105424074a5520c7b3c6c596af4a31d762279da7"
+      }
+    },
+    {
+      "id": "B03",
+      "split": "blind",
+      "source": "https://platfrom.tistory.com/entry/%EA%B9%8C%EC%B9%98%EC%82%B0%EC%97%AD%EC%84%9C%EC%9A%B8",
+      "article_image_number": 5,
+      "original_size": [
+        3000,
+        2000
+      ],
+      "original_bytes": 622204,
+      "original_sha256": "6dc605725a2a25d82460a8f8bea1ac9edb533aa9d0d8eb595a099841981322d8",
+      "expected": {
+        "group": "three",
+        "line": "5호선",
+        "current": "까치산",
+        "left": "신정",
+        "right": "화곡",
+        "arrow": "left",
+        "toward": "신정",
+        "note": ""
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "layout"
+        },
+        "sha256": "6dc605725a2a25d82460a8f8bea1ac9edb533aa9d0d8eb595a099841981322d8"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "5호선",
+          "left": {
+            "code": "519",
+            "name": "신정",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "518",
+            "name": "까치산",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "517",
+            "name": "화곡",
+            "nameRead": true,
+            "codeRead": false
+          }
+        },
+        "bytes": 622204,
+        "sha256": "6dc605725a2a25d82460a8f8bea1ac9edb533aa9d0d8eb595a099841981322d8"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "layout"
+        },
+        "sha256": "ba1afcc32052318962e531df681a0fc9a8df3ec439150aa5b0bc04d554295e0d"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "5호선",
+          "left": {
+            "code": "519",
+            "name": "신정",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "518",
+            "name": "까치산",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "517",
+            "name": "화곡",
+            "nameRead": true,
+            "codeRead": false
+          }
+        },
+        "sha256": "ba1afcc32052318962e531df681a0fc9a8df3ec439150aa5b0bc04d554295e0d"
+      }
+    },
+    {
+      "id": "B04",
+      "split": "blind",
+      "source": "https://platfrom.tistory.com/entry/%ED%99%94%EA%B3%A1%EC%97%AD%EC%84%9C%EC%9A%B8",
+      "article_image_number": 15,
+      "original_size": [
+        3000,
+        2000
+      ],
+      "original_bytes": 660723,
+      "original_sha256": "a35b49f4a3eaee835a7718d6a993bf709544eaa5f34c98eecc87862988695f29",
+      "expected": {
+        "group": "one",
+        "line": "5호선",
+        "current": "화곡",
+        "left": null,
+        "right": "우장산",
+        "arrow": "right",
+        "toward": "우장산",
+        "note": "기둥의 아래 칸에 우장산과 오른쪽 화살표"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "a35b49f4a3eaee835a7718d6a993bf709544eaa5f34c98eecc87862988695f29"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "bytes": 660723,
+        "sha256": "a35b49f4a3eaee835a7718d6a993bf709544eaa5f34c98eecc87862988695f29"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "c05ade93b9d3a9cc7ea70a4b7da62fc40a32078f6aef4b457e7fa875aad2e06d"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "c05ade93b9d3a9cc7ea70a4b7da62fc40a32078f6aef4b457e7fa875aad2e06d"
+      }
+    },
+    {
+      "id": "B07",
+      "split": "blind",
+      "source": "https://platfrom.tistory.com/entry/%EB%A7%88%EA%B3%A1%EC%97%AD%EC%84%9C%EC%9A%B8",
+      "article_image_number": 14,
+      "original_size": [
+        3000,
+        2000
+      ],
+      "original_bytes": 737895,
+      "original_sha256": "655bcbbc9776262098b953233b568cdd3b4fdf97d606c2fa5c54dd581809843c",
+      "expected": {
+        "group": "three",
+        "line": "5호선",
+        "current": "마곡",
+        "left": "송정",
+        "right": "발산",
+        "arrow": "left",
+        "toward": "송정",
+        "note": ""
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "655bcbbc9776262098b953233b568cdd3b4fdf97d606c2fa5c54dd581809843c"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "bytes": 737895,
+        "sha256": "655bcbbc9776262098b953233b568cdd3b4fdf97d606c2fa5c54dd581809843c"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "768a8564767c04ab58564d34c9d40012670d7174551a5c7d7c2e7e204979961a"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "768a8564767c04ab58564d34c9d40012670d7174551a5c7d7c2e7e204979961a"
+      }
+    },
+    {
+      "id": "B08",
+      "split": "blind",
+      "source": "https://platfrom.tistory.com/entry/%EC%86%A1%EC%A0%95%EC%97%AD%EC%84%9C%EC%9A%B8",
+      "article_image_number": 2,
+      "original_size": [
+        3000,
+        2000
+      ],
+      "original_bytes": 891607,
+      "original_sha256": "da6216f7c504f937674c97077dbc573105f0752c7e8bc967b4e49614f73c334a",
+      "expected": {
+        "group": "three",
+        "line": "5호선",
+        "current": "송정",
+        "left": "마곡",
+        "right": "김포공항",
+        "arrow": "left",
+        "toward": "마곡",
+        "note": ""
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "5호선",
+          "left": {
+            "code": "514",
+            "name": "마곡",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "513",
+            "name": "송정",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "512",
+            "name": "김포공항",
+            "nameRead": true,
+            "codeRead": false
+          }
+        },
+        "sha256": "da6216f7c504f937674c97077dbc573105f0752c7e8bc967b4e49614f73c334a"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "5호선",
+          "left": {
+            "code": "514",
+            "name": "마곡",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "513",
+            "name": "송정",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "512",
+            "name": "김포공항",
+            "nameRead": true,
+            "codeRead": false
+          }
+        },
+        "bytes": 891607,
+        "sha256": "da6216f7c504f937674c97077dbc573105f0752c7e8bc967b4e49614f73c334a"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "5호선",
+          "left": {
+            "code": "514",
+            "name": "마곡",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "513",
+            "name": "송정",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "512",
+            "name": "김포공항",
+            "nameRead": true,
+            "codeRead": false
+          }
+        },
+        "sha256": "04bc91b7b18d0d89f9ae4fc27cd4247abcc95f183030bc5aae8f218db1e53175"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "5호선",
+          "left": {
+            "code": "514",
+            "name": "마곡",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "513",
+            "name": "송정",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "512",
+            "name": "김포공항",
+            "nameRead": true,
+            "codeRead": false
+          }
+        },
+        "sha256": "04bc91b7b18d0d89f9ae4fc27cd4247abcc95f183030bc5aae8f218db1e53175"
+      }
+    },
+    {
+      "id": "B10",
+      "split": "blind",
+      "source": "https://platfrom.tistory.com/entry/%EB%B0%A9%ED%99%94%EC%97%AD%EC%84%9C%EC%9A%B8",
+      "article_image_number": 5,
+      "original_size": [
+        3000,
+        2000
+      ],
+      "original_bytes": 662165,
+      "original_sha256": "cc5566b0e2245167df438ff422eb6e3ad4c950bcb09795ff8e16eb6629bfe770",
+      "expected": {
+        "group": "hold",
+        "line": "5호선",
+        "current": "방화",
+        "left": "개화산",
+        "right": null,
+        "arrow": "right",
+        "toward": null,
+        "note": "종점, 화살표가 이웃 역명이 없는 쪽을 가리킴"
+      },
+      "photo_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "cc5566b0e2245167df438ff422eb6e3ad4c950bcb09795ff8e16eb6629bfe770"
+      },
+      "photo_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "bytes": 662165,
+        "sha256": "cc5566b0e2245167df438ff422eb6e3ad4c950bcb09795ff8e16eb6629bfe770"
+      },
+      "scaled_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "3f3db8174492a60796bffcbbcc3cb4a2c6d6778c866cedb508080fcac6a9a150"
+      },
+      "scaled_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "3f3db8174492a60796bffcbbcc3cb4a2c6d6778c866cedb508080fcac6a9a150"
+      }
+    },
+    {
+      "id": "B12",
+      "split": "blind",
+      "source": "https://platfrom.tistory.com/entry/%EA%B0%9C%ED%99%94%EC%97%AD%EC%84%9C%EC%9A%B8",
+      "article_image_number": 6,
+      "original_size": [
+        3000,
+        2000
+      ],
+      "original_bytes": 831436,
+      "original_sha256": "0c1a63d14bef09d7c8db6a40fd4bf75f2774f3fab90931e4b92772368fe27cd5",
+      "expected": {
+        "group": "hold",
+        "line": "9호선",
+        "current": "개화",
+        "left": "김포공항",
+        "right": null,
+        "arrow": null,
+        "toward": null,
+        "note": "종점 기둥, 방향 표시를 읽을 수 없음"
+      },
+      "photo_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "0c1a63d14bef09d7c8db6a40fd4bf75f2774f3fab90931e4b92772368fe27cd5"
+      },
+      "photo_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 831436,
+        "sha256": "0c1a63d14bef09d7c8db6a40fd4bf75f2774f3fab90931e4b92772368fe27cd5"
+      },
+      "scaled_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "3baba7b5a0dd53507e3bbb95221dcbd29062b15ee09bc47bfd68154acb47b146"
+      },
+      "scaled_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "3baba7b5a0dd53507e3bbb95221dcbd29062b15ee09bc47bfd68154acb47b146"
+      }
+    },
+    {
+      "id": "B13",
+      "split": "blind",
+      "source": "https://platfrom.tistory.com/entry/%EA%B9%80%ED%8F%AC%EA%B3%B5%ED%95%AD%EC%97%AD%EC%84%9C%EC%9A%B8",
+      "article_image_number": 7,
+      "original_size": [
+        3000,
+        2000
+      ],
+      "original_bytes": 814771,
+      "original_sha256": "9ec95064c26086b563982cf143366adfcf78507def6134f39635fa7a4f16ee8c",
+      "expected": {
+        "group": "tiered",
+        "line": "9호선",
+        "current": "김포공항",
+        "left": "공항시장",
+        "right": "개화",
+        "arrow": "right",
+        "toward": "개화",
+        "note": ""
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "layout"
+        },
+        "sha256": "9ec95064c26086b563982cf143366adfcf78507def6134f39635fa7a4f16ee8c"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "9호선",
+          "left": {
+            "code": "903",
+            "name": "공항시장",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "902",
+            "name": "김포공항",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "901",
+            "name": "개화",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "right",
+          "toward": "개화"
+        },
+        "bytes": 814771,
+        "sha256": "9ec95064c26086b563982cf143366adfcf78507def6134f39635fa7a4f16ee8c"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "layout"
+        },
+        "sha256": "37af6498702a09568ed88dd30d86d4bf8e4e8a7e945bbe988bdb36a86a21a432"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "9호선",
+          "left": {
+            "code": "903",
+            "name": "공항시장",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "902",
+            "name": "김포공항",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "901",
+            "name": "개화",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "right",
+          "toward": "개화"
+        },
+        "sha256": "37af6498702a09568ed88dd30d86d4bf8e4e8a7e945bbe988bdb36a86a21a432"
+      }
+    },
+    {
+      "id": "B15",
+      "split": "blind",
+      "source": "https://platfrom.tistory.com/entry/%EC%8B%A0%EB%B0%A9%ED%99%94%EC%97%AD%EC%84%9C%EC%9A%B8",
+      "article_image_number": 3,
+      "original_size": [
+        3000,
+        2000
+      ],
+      "original_bytes": 621302,
+      "original_sha256": "81693fbbab2694e7458fb80c8a436da8d791d021bedc4893a79baeba16264eb8",
+      "expected": {
+        "group": "tiered",
+        "line": "9호선",
+        "current": "신방화",
+        "left": "공항시장",
+        "right": "마곡나루",
+        "arrow": "left",
+        "toward": "공항시장",
+        "note": ""
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "81693fbbab2694e7458fb80c8a436da8d791d021bedc4893a79baeba16264eb8"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "9호선",
+          "left": {
+            "code": "903",
+            "name": "공항시장",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "904",
+            "name": "신방화",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "905",
+            "name": "마곡나루",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "공항시장"
+        },
+        "bytes": 621302,
+        "sha256": "81693fbbab2694e7458fb80c8a436da8d791d021bedc4893a79baeba16264eb8"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "83b6c9f7f1370fb5540aadb3fcda0f73bbe9acb69b5fa50a89cfdad6940715c0"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "9호선",
+          "left": {
+            "code": "903",
+            "name": "공항시장",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "904",
+            "name": "신방화",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "905",
+            "name": "마곡나루",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "공항시장"
+        },
+        "sha256": "83b6c9f7f1370fb5540aadb3fcda0f73bbe9acb69b5fa50a89cfdad6940715c0"
+      }
+    },
+    {
+      "id": "B17",
+      "split": "blind",
+      "source": "https://platfrom.tistory.com/entry/%EC%96%91%EC%B2%9C%ED%96%A5%EA%B5%90%EC%97%AD%EC%84%9C%EC%9A%B8",
+      "article_image_number": 3,
+      "original_size": [
+        2000,
+        1333
+      ],
+      "original_bytes": 333186,
+      "original_sha256": "1eb760b60669da021b86a3924daf0a3944a3df8374c8287684bf71a586ef1ac4",
+      "expected": {
+        "group": "tiered",
+        "line": "9호선",
+        "current": "양천향교",
+        "left": "마곡나루",
+        "right": "가양",
+        "arrow": "left",
+        "toward": "마곡나루",
+        "note": ""
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "layout"
+        },
+        "sha256": "1eb760b60669da021b86a3924daf0a3944a3df8374c8287684bf71a586ef1ac4"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "9호선",
+          "left": {
+            "code": "905",
+            "name": "마곡나루",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "906",
+            "name": "양천향교",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "907",
+            "name": "가양",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "마곡나루"
+        },
+        "bytes": 333186,
+        "sha256": "1eb760b60669da021b86a3924daf0a3944a3df8374c8287684bf71a586ef1ac4"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "layout"
+        },
+        "sha256": "32de3751ddb3f0abb9a09dd568581b1ccfea588afea0944eab9066430e161056"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "9호선",
+          "left": {
+            "code": "905",
+            "name": "마곡나루",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "906",
+            "name": "양천향교",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "907",
+            "name": "가양",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "마곡나루"
+        },
+        "sha256": "32de3751ddb3f0abb9a09dd568581b1ccfea588afea0944eab9066430e161056"
+      }
+    },
+    {
+      "id": "B19",
+      "split": "blind",
+      "source": "https://platfrom.tistory.com/entry/%EC%A6%9D%EB%AF%B8%EC%97%AD%EC%84%9C%EC%9A%B8",
+      "article_image_number": 3,
+      "original_size": [
+        2000,
+        1333
+      ],
+      "original_bytes": 209986,
+      "original_sha256": "4ebc5aa384ca31f71f930dc7c27157b0e5729db410c44ba9c837f561a0e44fad",
+      "expected": {
+        "group": "tiered",
+        "line": "9호선",
+        "current": "증미",
+        "left": "가양",
+        "right": "등촌",
+        "arrow": "left",
+        "toward": "가양",
+        "note": ""
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "layout"
+        },
+        "sha256": "4ebc5aa384ca31f71f930dc7c27157b0e5729db410c44ba9c837f561a0e44fad"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "9호선",
+          "left": {
+            "code": "907",
+            "name": "가양",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "908",
+            "name": "증미",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "909",
+            "name": "등촌",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "가양"
+        },
+        "bytes": 209986,
+        "sha256": "4ebc5aa384ca31f71f930dc7c27157b0e5729db410c44ba9c837f561a0e44fad"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "layout"
+        },
+        "sha256": "23504de992d3dbfb76cc9ad0111c2d7cdb2aaf9c3295b30f4a2732540c252f5f"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "9호선",
+          "left": {
+            "code": "907",
+            "name": "가양",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "908",
+            "name": "증미",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "909",
+            "name": "등촌",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "가양"
+        },
+        "sha256": "23504de992d3dbfb76cc9ad0111c2d7cdb2aaf9c3295b30f4a2732540c252f5f"
+      }
+    },
+    {
+      "id": "B20",
+      "split": "blind",
+      "source": "https://platfrom.tistory.com/entry/%EB%93%B1%EC%B4%8C%EC%97%AD%EC%84%9C%EC%9A%B8",
+      "article_image_number": 3,
+      "original_size": [
+        2000,
+        1333
+      ],
+      "original_bytes": 305424,
+      "original_sha256": "573e442f56b42a579a7e3136592dcdfd3982e22d24e5aa508facfb3d057f06da",
+      "expected": {
+        "group": "tiered",
+        "line": "9호선",
+        "current": "등촌",
+        "left": "증미",
+        "right": "염창",
+        "arrow": "left",
+        "toward": "증미",
+        "note": ""
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "573e442f56b42a579a7e3136592dcdfd3982e22d24e5aa508facfb3d057f06da"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "9호선",
+          "left": {
+            "code": "908",
+            "name": "증미",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "909",
+            "name": "등촌",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "910",
+            "name": "염창",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "증미"
+        },
+        "bytes": 305424,
+        "sha256": "573e442f56b42a579a7e3136592dcdfd3982e22d24e5aa508facfb3d057f06da"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "ff4b6a7b8dbd26a5bcd38aa7ccf500c412cffc96d169c04660dc6120cc003696"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "ff4b6a7b8dbd26a5bcd38aa7ccf500c412cffc96d169c04660dc6120cc003696"
+      }
+    },
+    {
+      "id": "B21",
+      "split": "blind",
+      "source": "https://platfrom.tistory.com/entry/%EC%97%BC%EC%B0%BD%EC%97%AD%EC%84%9C%EC%9A%B8",
+      "article_image_number": 12,
+      "original_size": [
+        2000,
+        1333
+      ],
+      "original_bytes": 443495,
+      "original_sha256": "2e4ed2058081927e1db847d71ba9d94a1bf1564dedcf230a1b7ca0cf3de1c074",
+      "expected": {
+        "group": "tiered",
+        "line": "9호선",
+        "current": "염창",
+        "left": "등촌",
+        "right": "신목동",
+        "arrow": "left",
+        "toward": "등촌",
+        "note": "표지판을 비스듬히 촬영"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "2e4ed2058081927e1db847d71ba9d94a1bf1564dedcf230a1b7ca0cf3de1c074"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 443495,
+        "sha256": "2e4ed2058081927e1db847d71ba9d94a1bf1564dedcf230a1b7ca0cf3de1c074"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "2b6cf6790a7a0ca92dea8e0c8eb664c8d34fcf379ee3ab314edd0e149462bd73"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "2b6cf6790a7a0ca92dea8e0c8eb664c8d34fcf379ee3ab314edd0e149462bd73"
+      }
+    },
+    {
+      "id": "B22",
+      "split": "blind",
+      "source": "https://platfrom.tistory.com/entry/%EC%8B%A0%EB%AA%A9%EB%8F%99%EC%97%AD%EC%84%9C%EC%9A%B8",
+      "article_image_number": 3,
+      "original_size": [
+        2000,
+        1333
+      ],
+      "original_bytes": 208243,
+      "original_sha256": "0b3c6b4220cb3d7f7a4ee3c3dae8495f5276cc93a38c4b028e6f54919ba1fae6",
+      "expected": {
+        "group": "tiered",
+        "line": "9호선",
+        "current": "신목동",
+        "left": "염창",
+        "right": "선유도",
+        "arrow": "left",
+        "toward": "염창",
+        "note": ""
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "layout"
+        },
+        "sha256": "0b3c6b4220cb3d7f7a4ee3c3dae8495f5276cc93a38c4b028e6f54919ba1fae6"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "9호선",
+          "left": {
+            "code": "910",
+            "name": "염창",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "911",
+            "name": "신목동",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "912",
+            "name": "선유도",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "염창"
+        },
+        "bytes": 208243,
+        "sha256": "0b3c6b4220cb3d7f7a4ee3c3dae8495f5276cc93a38c4b028e6f54919ba1fae6"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "layout"
+        },
+        "sha256": "48973ba199cdd5ccb74d151e358df7df27614b25e2544a145ec7d36fd9fa60c0"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "9호선",
+          "left": {
+            "code": "910",
+            "name": "염창",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "911",
+            "name": "신목동",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "912",
+            "name": "선유도",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "염창"
+        },
+        "sha256": "48973ba199cdd5ccb74d151e358df7df27614b25e2544a145ec7d36fd9fa60c0"
+      }
+    },
+    {
+      "id": "B26",
+      "split": "blind",
+      "source": "https://platfrom.tistory.com/entry/%EC%97%AC%EC%9D%98%EB%8F%84%EC%97%AD%EC%84%9C%EC%9A%B8",
+      "article_image_number": 8,
+      "original_size": [
+        1000,
+        667
+      ],
+      "original_bytes": 70897,
+      "original_sha256": "d0a0bb4458ef39ee12cec5241b0de1ae317469a3e44e41f847df74985bd4e2a0",
+      "expected": {
+        "group": "tiered",
+        "line": "9호선",
+        "current": "여의도",
+        "left": "국회의사당",
+        "right": "샛강",
+        "arrow": "left",
+        "toward": "국회의사당",
+        "note": ""
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "layout"
+        },
+        "sha256": "d0a0bb4458ef39ee12cec5241b0de1ae317469a3e44e41f847df74985bd4e2a0"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "9호선",
+          "left": {
+            "code": "914",
+            "name": "국회의사당",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "915",
+            "name": "여의도",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "916",
+            "name": "샛강",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "국회의사당"
+        },
+        "bytes": 70897,
+        "sha256": "d0a0bb4458ef39ee12cec5241b0de1ae317469a3e44e41f847df74985bd4e2a0"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "layout"
+        },
+        "sha256": "eec6061acd83d67d540926e9027127d532520bdf9eda214c356d4a543165200a"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "9호선",
+          "left": {
+            "code": "914",
+            "name": "국회의사당",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "915",
+            "name": "여의도",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "916",
+            "name": "샛강",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "arrow": "left",
+          "toward": "국회의사당"
+        },
+        "sha256": "eec6061acd83d67d540926e9027127d532520bdf9eda214c356d4a543165200a"
+      }
+    },
+    {
+      "id": "B30",
+      "split": "blind",
+      "source": "https://platfrom.tistory.com/entry/%EC%88%AD%EC%9D%98%EC%97%AD%EC%9D%B8%EC%B2%9C",
+      "article_image_number": 2,
+      "original_size": [
+        1500,
+        1000
+      ],
+      "original_bytes": 788192,
+      "original_sha256": "84fa223b3e4a9102738f698bcd0748e6e7ccf09bde9dc02a7db4c8fa620940ee",
+      "expected": {
+        "group": "tiered",
+        "line": "수인분당선",
+        "current": "숭의",
+        "left": "신포",
+        "right": "인하대",
+        "arrow": "right",
+        "toward": "인하대",
+        "note": "촬영 당시 수인선"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "84fa223b3e4a9102738f698bcd0748e6e7ccf09bde9dc02a7db4c8fa620940ee"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "bytes": 788192,
+        "sha256": "84fa223b3e4a9102738f698bcd0748e6e7ccf09bde9dc02a7db4c8fa620940ee"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "30d5205b57e1d0ee1a1fcd7bf713a5110026e35547940270df1ba511cc940671"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "30d5205b57e1d0ee1a1fcd7bf713a5110026e35547940270df1ba511cc940671"
+      }
+    },
+    {
+      "id": "B33",
+      "split": "blind",
+      "source": "https://platfrom.tistory.com/entry/%EC%86%A1%EB%8F%84%EC%97%AD%EC%9D%B8%EC%B2%9C",
+      "article_image_number": 11,
+      "original_size": [
+        1500,
+        1000
+      ],
+      "original_bytes": 1035989,
+      "original_sha256": "17fce67b2df2a6eb4bcfb2bae2b1ab9dc4d45c7063ee4ab768b2040666476d54",
+      "expected": {
+        "group": "three",
+        "line": "수인분당선",
+        "current": "송도",
+        "left": "연수",
+        "right": "인하대",
+        "arrow": "right",
+        "toward": "인하대",
+        "note": "촬영 당시 수인선"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "17fce67b2df2a6eb4bcfb2bae2b1ab9dc4d45c7063ee4ab768b2040666476d54"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "bytes": 1035989,
+        "sha256": "17fce67b2df2a6eb4bcfb2bae2b1ab9dc4d45c7063ee4ab768b2040666476d54"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "826179901b63735e55cb79eba7a775b8be97d4fa81664646fe93c3e3d23b7bf8"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "826179901b63735e55cb79eba7a775b8be97d4fa81664646fe93c3e3d23b7bf8"
+      }
+    },
+    {
+      "id": "B34",
+      "split": "blind",
+      "source": "https://platfrom.tistory.com/entry/%EC%97%B0%EC%88%98%EC%97%AD%EC%9D%B8%EC%B2%9C",
+      "article_image_number": 7,
+      "original_size": [
+        1500,
+        1000
+      ],
+      "original_bytes": 969929,
+      "original_sha256": "abf05245611b28ef6135c3e8c1f730b4f5efc46fb9a6c5661d1af672c5466900",
+      "expected": {
+        "group": "three",
+        "line": "수인분당선",
+        "current": "연수",
+        "left": "송도",
+        "right": "원인재",
+        "arrow": "right",
+        "toward": "원인재",
+        "note": "촬영 당시 수인선"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "abf05245611b28ef6135c3e8c1f730b4f5efc46fb9a6c5661d1af672c5466900"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "bytes": 969929,
+        "sha256": "abf05245611b28ef6135c3e8c1f730b4f5efc46fb9a6c5661d1af672c5466900"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "413c54af074a445e46fb63ecb400241e23a2f10d830eb1ff30869b9da47cd048"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "413c54af074a445e46fb63ecb400241e23a2f10d830eb1ff30869b9da47cd048"
+      }
+    },
+    {
+      "id": "B37",
+      "split": "blind",
+      "source": "https://platfrom.tistory.com/entry/%ED%98%B8%EA%B5%AC%ED%8F%AC%EC%97%AD%EC%9D%B8%EC%B2%9C",
+      "article_image_number": 11,
+      "original_size": [
+        1500,
+        1000
+      ],
+      "original_bytes": 802034,
+      "original_sha256": "812e709f4cf2e91b180a6685096211777d81bc8e9e60d07fbc050b340b630c35",
+      "expected": {
+        "group": "three",
+        "line": "수인분당선",
+        "current": "호구포",
+        "left": "인천논현",
+        "right": "남동인더스파크",
+        "arrow": "right",
+        "toward": "남동인더스파크",
+        "note": "촬영 당시 수인선"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "812e709f4cf2e91b180a6685096211777d81bc8e9e60d07fbc050b340b630c35"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "bytes": 802034,
+        "sha256": "812e709f4cf2e91b180a6685096211777d81bc8e9e60d07fbc050b340b630c35"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "2a9f2343c16ae01189fbadd41c22583799dbd7fc22cfac1d0ce6becfb86e8fdb"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "2a9f2343c16ae01189fbadd41c22583799dbd7fc22cfac1d0ce6becfb86e8fdb"
+      }
+    },
+    {
+      "id": "B38",
+      "split": "blind",
+      "source": "https://platfrom.tistory.com/entry/%EC%9D%B8%EC%B2%9C%EB%85%BC%ED%98%84%EC%97%AD%EC%9D%B8%EC%B2%9C",
+      "article_image_number": 4,
+      "original_size": [
+        1500,
+        1000
+      ],
+      "original_bytes": 1116771,
+      "original_sha256": "e1e4312d926c9829a06794bad99c0484e7c7b099249d4ece7d25948afe0f6ddc",
+      "expected": {
+        "group": "three",
+        "line": "수인분당선",
+        "current": "인천논현",
+        "left": "소래포구",
+        "right": "호구포",
+        "arrow": "right",
+        "toward": "호구포",
+        "note": "촬영 당시 수인선"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "e1e4312d926c9829a06794bad99c0484e7c7b099249d4ece7d25948afe0f6ddc"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 1116771,
+        "sha256": "e1e4312d926c9829a06794bad99c0484e7c7b099249d4ece7d25948afe0f6ddc"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "caa321bd1ce3ef2359b86ba2131f51ccf7f4d70ff21e333c605eb4bc7795619e"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "caa321bd1ce3ef2359b86ba2131f51ccf7f4d70ff21e333c605eb4bc7795619e"
+      }
+    },
+    {
+      "id": "B39",
+      "split": "blind",
+      "source": "https://platfrom.tistory.com/entry/%EC%86%8C%EB%9E%98%ED%8F%AC%EA%B5%AC%EC%97%AD%EC%9D%B8%EC%B2%9C",
+      "article_image_number": 14,
+      "original_size": [
+        1500,
+        1000
+      ],
+      "original_bytes": 867464,
+      "original_sha256": "f9effb2a10c9e903c8876fe3ab0f2b79fec2e3f3039041b5ca635fe440481111",
+      "expected": {
+        "group": "hold",
+        "line": "수인선(협궤)",
+        "current": "소래",
+        "left": "달월",
+        "right": "남동",
+        "arrow": null,
+        "toward": null,
+        "note": "보존된 옛 협궤 역명판, 화살표 없음"
+      },
+      "photo_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "f9effb2a10c9e903c8876fe3ab0f2b79fec2e3f3039041b5ca635fe440481111"
+      },
+      "photo_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 867464,
+        "sha256": "f9effb2a10c9e903c8876fe3ab0f2b79fec2e3f3039041b5ca635fe440481111"
+      },
+      "scaled_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "bdc1a8dfea8e5d3848c8e57a6b56af20bd942f4c99369d0e122601532eed3b98"
+      },
+      "scaled_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "bdc1a8dfea8e5d3848c8e57a6b56af20bd942f4c99369d0e122601532eed3b98"
+      }
+    },
+    {
+      "id": "B40",
+      "split": "blind",
+      "source": "https://platfrom.tistory.com/entry/%EC%9B%94%EA%B3%B6%EC%97%AD%EA%B2%BD%EA%B8%B0",
+      "article_image_number": 6,
+      "original_size": [
+        1500,
+        1000
+      ],
+      "original_bytes": 1128255,
+      "original_sha256": "013b7c4f6bfd1d19bee5aaadfdb122a43bfc4292ac21e1a7ac8e208075e2f23b",
+      "expected": {
+        "group": "three",
+        "line": "수인분당선",
+        "current": "월곶",
+        "left": "달월",
+        "right": "소래포구",
+        "arrow": "right",
+        "toward": "소래포구",
+        "note": "촬영 당시 수인선"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "013b7c4f6bfd1d19bee5aaadfdb122a43bfc4292ac21e1a7ac8e208075e2f23b"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 1128255,
+        "sha256": "013b7c4f6bfd1d19bee5aaadfdb122a43bfc4292ac21e1a7ac8e208075e2f23b"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "4b3bc1b006dec179ab8c0265945a41ef9ad347610493a4945012ee59b1e4a052"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "4b3bc1b006dec179ab8c0265945a41ef9ad347610493a4945012ee59b1e4a052"
+      }
+    },
+    {
+      "id": "B42",
+      "split": "blind",
+      "source": "https://platfrom.tistory.com/entry/%EC%98%A4%EC%9D%B4%EB%8F%84%EC%97%AD%EA%B2%BD%EA%B8%B0",
+      "article_image_number": 9,
+      "original_size": [
+        1500,
+        1000
+      ],
+      "original_bytes": 1585531,
+      "original_sha256": "b97d66e1590cecb9fe0ec239654f5197ff2bef16cec5e9c96f6f4c8d03639f7c",
+      "expected": {
+        "group": "three",
+        "line": "수인분당선",
+        "current": "오이도",
+        "left": "달월",
+        "right": "정왕",
+        "arrow": "left",
+        "toward": "달월",
+        "note": "촬영 당시 수인선, 현재역에 456 표기"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "수인분당선",
+          "left": {
+            "code": "K259",
+            "name": "달월",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "current": {
+            "code": "K258",
+            "name": "오이도",
+            "nameRead": true,
+            "codeRead": false
+          },
+          "right": {
+            "code": "K257",
+            "name": "정왕",
+            "nameRead": true,
+            "codeRead": false
+          }
+        },
+        "sha256": "b97d66e1590cecb9fe0ec239654f5197ff2bef16cec5e9c96f6f4c8d03639f7c"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "bytes": 1585531,
+        "sha256": "b97d66e1590cecb9fe0ec239654f5197ff2bef16cec5e9c96f6f4c8d03639f7c"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "c49f8b4f527fe14306a690b120f98cfc1f62e1f17a1bc5778dd3753353319342"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "c49f8b4f527fe14306a690b120f98cfc1f62e1f17a1bc5778dd3753353319342"
+      }
+    },
+    {
+      "id": "B84",
+      "split": "blind",
+      "source": "https://platfrom.tistory.com/entry/%EC%95%94%EC%82%AC%EC%97%AD%EC%84%9C%EC%9A%B8",
+      "article_image_number": 11,
+      "original_size": [
+        5472,
+        3648
+      ],
+      "original_bytes": 6913990,
+      "original_sha256": "bcfc300ab0e1a802f03b31961cc57043cf8dad6114dd7ca84fc86a9993963165",
+      "expected": {
+        "group": "hold",
+        "line": "8호선",
+        "current": "암사",
+        "left": null,
+        "right": null,
+        "arrow": null,
+        "toward": null,
+        "note": "승강장 전경, 방면을 특정할 수 없음"
+      },
+      "photo_before": {
+        "outcome": "input_rejected",
+        "http": 413,
+        "body": {
+          "message": "File too large",
+          "error": "Payload Too Large",
+          "statusCode": 413
+        },
+        "sha256": "bcfc300ab0e1a802f03b31961cc57043cf8dad6114dd7ca84fc86a9993963165"
+      },
+      "photo_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 356968,
+        "sha256": "514d768272799546817d84f48bf7c4bd176747ddbbd3d5c78257e035cff6fd5c"
+      },
+      "scaled_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "514d768272799546817d84f48bf7c4bd176747ddbbd3d5c78257e035cff6fd5c"
+      },
+      "scaled_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "514d768272799546817d84f48bf7c4bd176747ddbbd3d5c78257e035cff6fd5c"
+      }
+    },
+    {
+      "id": "J466",
+      "split": "blind",
+      "source": "https://tjo4183.tistory.com/466",
+      "article_image_number": 10,
+      "original_size": [
+        820,
+        615
+      ],
+      "original_bytes": 215341,
+      "original_sha256": "e36e35dc70afd14cc63a424ca419c8064f987f4a57af78abcd129616af67f675",
+      "expected": {
+        "group": "three",
+        "line": "1호선",
+        "current": "개봉",
+        "left": "구일",
+        "right": "오류동",
+        "arrow": "right",
+        "toward": "오류동",
+        "note": ""
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "1호선",
+          "left": {
+            "code": "142",
+            "name": "구일",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "143",
+            "name": "개봉",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "144",
+            "name": "오류동",
+            "nameRead": true,
+            "codeRead": true
+          }
+        },
+        "sha256": "e36e35dc70afd14cc63a424ca419c8064f987f4a57af78abcd129616af67f675"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "1호선",
+          "left": {
+            "code": "142",
+            "name": "구일",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "143",
+            "name": "개봉",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "144",
+            "name": "오류동",
+            "nameRead": true,
+            "codeRead": true
+          }
+        },
+        "bytes": 215341,
+        "sha256": "e36e35dc70afd14cc63a424ca419c8064f987f4a57af78abcd129616af67f675"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "1호선",
+          "left": {
+            "code": "142",
+            "name": "구일",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "143",
+            "name": "개봉",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "144",
+            "name": "오류동",
+            "nameRead": true,
+            "codeRead": true
+          }
+        },
+        "sha256": "bebeea543cef561c69acc53c8749373073d768864b73ce36a44fe281ee369443"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "1호선",
+          "left": {
+            "code": "142",
+            "name": "구일",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "143",
+            "name": "개봉",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "144",
+            "name": "오류동",
+            "nameRead": true,
+            "codeRead": true
+          }
+        },
+        "sha256": "bebeea543cef561c69acc53c8749373073d768864b73ce36a44fe281ee369443"
+      }
+    },
+    {
+      "id": "J465",
+      "split": "blind",
+      "source": "https://tjo4183.tistory.com/465",
+      "article_image_number": 17,
+      "original_size": [
+        820,
+        615
+      ],
+      "original_bytes": 106463,
+      "original_sha256": "4a8824d5ac3fb74a95585a8568c53a478925f33d9282322ce8b4a90b03efbb94",
+      "expected": {
+        "group": "three",
+        "line": "1호선",
+        "current": "구일",
+        "left": "개봉",
+        "right": "구로",
+        "arrow": "left",
+        "toward": "개봉",
+        "note": ""
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "1호선",
+          "left": {
+            "code": "143",
+            "name": "개봉",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "142",
+            "name": "구일",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "141",
+            "name": "구로",
+            "nameRead": true,
+            "codeRead": false
+          }
+        },
+        "sha256": "4a8824d5ac3fb74a95585a8568c53a478925f33d9282322ce8b4a90b03efbb94"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "1호선",
+          "left": {
+            "code": "143",
+            "name": "개봉",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "142",
+            "name": "구일",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "141",
+            "name": "구로",
+            "nameRead": true,
+            "codeRead": false
+          }
+        },
+        "bytes": 106463,
+        "sha256": "4a8824d5ac3fb74a95585a8568c53a478925f33d9282322ce8b4a90b03efbb94"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "1호선",
+          "left": {
+            "code": "143",
+            "name": "개봉",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "142",
+            "name": "구일",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "141",
+            "name": "구로",
+            "nameRead": true,
+            "codeRead": false
+          }
+        },
+        "sha256": "ac809698b0ab4189efcc6eaf9b6ec6937a2d40069d9215260422c264a57f27d2"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "1호선",
+          "left": {
+            "code": "143",
+            "name": "개봉",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "142",
+            "name": "구일",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "141",
+            "name": "구로",
+            "nameRead": true,
+            "codeRead": false
+          }
+        },
+        "sha256": "ac809698b0ab4189efcc6eaf9b6ec6937a2d40069d9215260422c264a57f27d2"
+      }
+    },
+    {
+      "id": "J416",
+      "split": "blind",
+      "source": "https://tjo4183.tistory.com/416",
+      "article_image_number": 13,
+      "original_size": [
+        820,
+        1093
+      ],
+      "original_bytes": 235533,
+      "original_sha256": "71d9cdfd545538dcdc76f4b12d72614108060c26ce89097a9f06a6a16fff4bda",
+      "expected": {
+        "group": "hold",
+        "line": "1호선",
+        "current": "당정",
+        "left": null,
+        "right": null,
+        "arrow": null,
+        "toward": null,
+        "note": "기둥에 현재역 이름만 표시"
+      },
+      "photo_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "71d9cdfd545538dcdc76f4b12d72614108060c26ce89097a9f06a6a16fff4bda"
+      },
+      "photo_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 235533,
+        "sha256": "71d9cdfd545538dcdc76f4b12d72614108060c26ce89097a9f06a6a16fff4bda"
+      },
+      "scaled_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "6e2747a1a2a1c7fef49ec6aca51db3c79d93f03eef5a0b02d0d8dfaa3adf12d3"
+      },
+      "scaled_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "6e2747a1a2a1c7fef49ec6aca51db3c79d93f03eef5a0b02d0d8dfaa3adf12d3"
+      }
+    },
+    {
+      "id": "J415",
+      "split": "blind",
+      "source": "https://tjo4183.tistory.com/415",
+      "article_image_number": 14,
+      "original_size": [
+        820,
+        615
+      ],
+      "original_bytes": 168635,
+      "original_sha256": "0dcf8a1a424936b3e04ba4197a92f90c9e9e555f1aa759577832b3507d140389",
+      "expected": {
+        "group": "three",
+        "line": "1호선",
+        "current": "군포",
+        "left": "금정",
+        "right": "당정",
+        "arrow": "left",
+        "toward": "금정",
+        "note": ""
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "1호선",
+          "left": {
+            "code": "P149",
+            "name": "금정",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "P150",
+            "name": "군포",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "P151",
+            "name": "당정",
+            "nameRead": true,
+            "codeRead": false
+          }
+        },
+        "sha256": "0dcf8a1a424936b3e04ba4197a92f90c9e9e555f1aa759577832b3507d140389"
+      },
+      "photo_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "1호선",
+          "left": {
+            "code": "P149",
+            "name": "금정",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "P150",
+            "name": "군포",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "P151",
+            "name": "당정",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "arrow": "left",
+          "toward": "금정"
+        },
+        "bytes": 168635,
+        "sha256": "0dcf8a1a424936b3e04ba4197a92f90c9e9e555f1aa759577832b3507d140389"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "arrow_missing",
+          "line": "1호선",
+          "left": {
+            "code": "P149",
+            "name": "금정",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "P150",
+            "name": "군포",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "P151",
+            "name": "당정",
+            "nameRead": true,
+            "codeRead": false
+          }
+        },
+        "sha256": "7c262d0767fa287960a205bb00e9c35dc884c2903217bf7d29359c80abd73ef8"
+      },
+      "scaled_after": {
+        "outcome": "correct",
+        "http": 200,
+        "body": {
+          "status": "recognized",
+          "line": "1호선",
+          "left": {
+            "code": "P149",
+            "name": "금정",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "current": {
+            "code": "P150",
+            "name": "군포",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "right": {
+            "code": "P151",
+            "name": "당정",
+            "nameRead": true,
+            "codeRead": true
+          },
+          "arrow": "left",
+          "toward": "금정"
+        },
+        "sha256": "7c262d0767fa287960a205bb00e9c35dc884c2903217bf7d29359c80abd73ef8"
+      }
+    },
+    {
+      "id": "J370",
+      "split": "blind",
+      "source": "https://tjo4183.tistory.com/370",
+      "article_image_number": 3,
+      "original_size": [
+        820,
+        615
+      ],
+      "original_bytes": 173557,
+      "original_sha256": "c179a684dc6483b31de7b16536983f8b47d9931e826ab2ad830469a77c8bc29a",
+      "expected": {
+        "group": "hold",
+        "line": "2호선",
+        "current": "문래",
+        "left": null,
+        "right": null,
+        "arrow": null,
+        "toward": null,
+        "note": "출입구 표지"
+      },
+      "photo_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "c179a684dc6483b31de7b16536983f8b47d9931e826ab2ad830469a77c8bc29a"
+      },
+      "photo_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 173557,
+        "sha256": "c179a684dc6483b31de7b16536983f8b47d9931e826ab2ad830469a77c8bc29a"
+      },
+      "scaled_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "ef3a4c87f6644f6bbf40ca022886da7f58a64b94fa867bf4c96e345176dae478"
+      },
+      "scaled_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "ef3a4c87f6644f6bbf40ca022886da7f58a64b94fa867bf4c96e345176dae478"
+      }
+    },
+    {
+      "id": "J366",
+      "split": "blind",
+      "source": "https://tjo4183.tistory.com/366",
+      "article_image_number": 11,
+      "original_size": [
+        820,
+        615
+      ],
+      "original_bytes": 159352,
+      "original_sha256": "c5e2b0ad0e239581e9d95b47534aac3a1917f1d414887d83bd18960bb18a47f5",
+      "expected": {
+        "group": "hold",
+        "line": "4호선",
+        "current": "상록수",
+        "left": null,
+        "right": null,
+        "arrow": null,
+        "toward": null,
+        "note": "현재역 이름만 표시"
+      },
+      "photo_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "c5e2b0ad0e239581e9d95b47534aac3a1917f1d414887d83bd18960bb18a47f5"
+      },
+      "photo_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 159352,
+        "sha256": "c5e2b0ad0e239581e9d95b47534aac3a1917f1d414887d83bd18960bb18a47f5"
+      },
+      "scaled_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "4c8208aea7439f898caf361b3f5eea422ff4c63b8c8aa57f2dc22970b0b51739"
+      },
+      "scaled_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "4c8208aea7439f898caf361b3f5eea422ff4c63b8c8aa57f2dc22970b0b51739"
+      }
+    },
+    {
+      "id": "J364",
+      "split": "blind",
+      "source": "https://tjo4183.tistory.com/364",
+      "article_image_number": 4,
+      "original_size": [
+        820,
+        615
+      ],
+      "original_bytes": 193426,
+      "original_sha256": "3826edc09daaec77e048cf31ad622dbcb2d0b60fc3fa9614ffbd3a1824520734",
+      "expected": {
+        "group": "hold",
+        "line": "4호선",
+        "current": "수리산",
+        "left": null,
+        "right": null,
+        "arrow": null,
+        "toward": null,
+        "note": "역사 외관"
+      },
+      "photo_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "3826edc09daaec77e048cf31ad622dbcb2d0b60fc3fa9614ffbd3a1824520734"
+      },
+      "photo_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 193426,
+        "sha256": "3826edc09daaec77e048cf31ad622dbcb2d0b60fc3fa9614ffbd3a1824520734"
+      },
+      "scaled_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "48f743df820ce7e55fb6d50aad300f66e24e52a5cf7f0bac824de43cf72067e1"
+      },
+      "scaled_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "48f743df820ce7e55fb6d50aad300f66e24e52a5cf7f0bac824de43cf72067e1"
+      }
+    },
+    {
+      "id": "J355",
+      "split": "blind",
+      "source": "https://tjo4183.tistory.com/355",
+      "article_image_number": 12,
+      "original_size": [
+        820,
+        1093
+      ],
+      "original_bytes": 331269,
+      "original_sha256": "55bec14c99892a878f1fda3e10ebc95f830fbb79937a1e9374ed64b5c48bf1db",
+      "expected": {
+        "group": "hold",
+        "line": "인천1호선",
+        "current": "작전",
+        "left": "경인교대입구",
+        "right": "갈산",
+        "arrow": null,
+        "toward": null,
+        "note": "양쪽 이웃에 각각 반대 방향 화살표"
+      },
+      "photo_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "55bec14c99892a878f1fda3e10ebc95f830fbb79937a1e9374ed64b5c48bf1db"
+      },
+      "photo_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "bytes": 331269,
+        "sha256": "55bec14c99892a878f1fda3e10ebc95f830fbb79937a1e9374ed64b5c48bf1db"
+      },
+      "scaled_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "6bf23efd1736bbeacda77ebfdc72736ea3cef62ea0689c02783bf021009564a3"
+      },
+      "scaled_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "topology_conflict"
+        },
+        "sha256": "6bf23efd1736bbeacda77ebfdc72736ea3cef62ea0689c02783bf021009564a3"
+      }
+    },
+    {
+      "id": "J353",
+      "split": "blind",
+      "source": "https://tjo4183.tistory.com/353",
+      "article_image_number": 11,
+      "original_size": [
+        820,
+        615
+      ],
+      "original_bytes": 113659,
+      "original_sha256": "35c8fa46791235d711f57e4e688c66133cb42471cbaca92c7f46582c3ef42eae",
+      "expected": {
+        "group": "three",
+        "line": "수인분당선",
+        "current": "영통",
+        "left": "망포",
+        "right": "청명",
+        "arrow": "right",
+        "toward": "청명",
+        "note": "촬영 당시 분당선"
+      },
+      "photo_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "35c8fa46791235d711f57e4e688c66133cb42471cbaca92c7f46582c3ef42eae"
+      },
+      "photo_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 113659,
+        "sha256": "35c8fa46791235d711f57e4e688c66133cb42471cbaca92c7f46582c3ef42eae"
+      },
+      "scaled_before": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "129dc1c10cd13993180cbad642adb21d8557cd0a6de6aeb4fe3a2ff7010dfed6"
+      },
+      "scaled_after": {
+        "outcome": "abstained",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "129dc1c10cd13993180cbad642adb21d8557cd0a6de6aeb4fe3a2ff7010dfed6"
+      }
+    },
+    {
+      "id": "J342",
+      "split": "blind",
+      "source": "https://tjo4183.tistory.com/342",
+      "article_image_number": 6,
+      "original_size": [
+        820,
+        1093
+      ],
+      "original_bytes": 242516,
+      "original_sha256": "82988dab07c31f6a5377915359da7b374489153a051d4cf802edb6b8d935ba53",
+      "expected": {
+        "group": "hold",
+        "line": "1호선",
+        "current": "망월사",
+        "left": null,
+        "right": null,
+        "arrow": null,
+        "toward": null,
+        "note": "현재역 이름만 표시"
+      },
+      "photo_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "82988dab07c31f6a5377915359da7b374489153a051d4cf802edb6b8d935ba53"
+      },
+      "photo_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "bytes": 242516,
+        "sha256": "82988dab07c31f6a5377915359da7b374489153a051d4cf802edb6b8d935ba53"
+      },
+      "scaled_before": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "e691b1915b9b66207be5aee6568f398662c3697748e986eaf519aa6c81ca7c17"
+      },
+      "scaled_after": {
+        "outcome": "expected_abstention",
+        "http": 200,
+        "body": {
+          "status": "pending",
+          "reason": "station_text"
+        },
+        "sha256": "e691b1915b9b66207be5aee6568f398662c3697748e986eaf519aa6c81ca7c17"
+      }
+    }
+  ]
+}

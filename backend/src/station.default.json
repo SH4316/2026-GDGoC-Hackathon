@@ -1,0 +1,15 @@
+{
+  "tagSideM": 0.16,
+  "tags": [
+    { "id": 4, "center": [-0.25, 0], "yawDeg": 0 },
+    { "id": 5, "center": [0.25, 1], "yawDeg": 0 },
+    { "id": 6, "center": [-0.25, 2], "yawDeg": 0 },
+    { "id": 3, "center": [1, 2.25], "yawDeg": 90 }
+  ],
+  "route": [[0, 0], [0, 2], [1.75, 2]],
+  "camera": { "diagonalFovDeg": 70, "calibration": null },
+  "terrain": {
+    "name": "실험 복도 (예시)",
+    "outline": [[-0.55, -0.28], [0.55, -0.28], [0.55, 1.45], [2.05, 1.45], [2.05, 2.55], [-0.55, 2.55]]
+  }
+}
