@@ -8,10 +8,3 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
-
-  cloudflared:
-    image: cloudflare/cloudflared:2026.11.1
-    command: ["tunnel", "--no-autoupdate", "--url", "http://web:80"]
-    depends_on:
-      web:
-        condition: service_healthy

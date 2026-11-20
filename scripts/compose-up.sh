@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
-docker compose up --build --wait
+exec docker compose up --build --wait --remove-orphans

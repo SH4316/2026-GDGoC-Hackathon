@@ -23,6 +23,20 @@ A4 인쇄용 PNG는 300 dpi다. [태그 0](experiments/corridor/images/tag-0.png
 
 ## HTTP로 실행
 
+### Docker Compose
+
+Docker Engine과 Docker Compose가 실행 가능한 PC에서 저장소 루트의 스크립트를 실행한다.
+
+```bash
+./scripts/compose-up.sh
+```
+
+스크립트는 `docker compose up --build --wait --remove-orphans`를 실행한다. 프런트엔드를 빌드하고 Nginx가 `station.json`을 제공할 때까지 기다린다. 같은 Compose 프로젝트에서 이전 tunnel처럼 현재 설정에서 빠진 서비스의 컨테이너를 정리한다.
+
+PC에서는 `http://localhost:8080`, 같은 네트워크의 다른 기기에서는 `http://<PC의 IP>:8080`을 연다. 포트를 바꾸려면 `APP_PORT=8090 ./scripts/compose-up.sh`로 실행한다. 종료는 `docker compose down`이다.
+
+### Vite 개발 서버
+
 Bash와 Node.js 24.15 이상(npm 포함)이 있는 PC에서 저장소 루트의 스크립트를 실행한다. 첫 실행 시 의존성을 설치하고 Vite를 `0.0.0.0:8080`에서 시작한다.
 
 ```bash
@@ -42,8 +56,6 @@ adb reverse tcp:8080 tcp:8080
 휴대폰의 Chrome에서 `http://localhost:8080`을 열고 카메라를 허용한다. PC 서버 포트를 변경했다면 명령의 두 번째 포트를 그 값으로 바꾼다.
 
 기본 후면 렌즈를 태그와 그 앞의 바닥이 함께 보이게 기울인다. 출발점에서 정면 화살표, 코너에 접근하면 오른쪽 화살표를 확인한다. 화살표를 그릴 바닥 위치가 화면 밖에 있거나 태그를 놓치면 영상만 보인다. 카메라 권한을 거부했다면 브라우저 사이트 설정에서 허용하고 화면을 한 번 누르거나 새로고침한다. [합성 시험 영상으로 캡처한 직진·우회전 AR 화면](experiments/corridor/images/ar-camera.png)
-
-기존 Docker Compose로 HTTPS 접속이 필요할 때는 `./scripts/compose-up.sh`를 실행하고 `docker compose logs cloudflared`에 출력되는 주소를 연다.
 
 ### 고정 도메인에서 Certbot으로 HTTPS 실행
 
