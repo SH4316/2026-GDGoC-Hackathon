@@ -5,11 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "test": "node --test tests/station.test.cjs",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
-    "@fontsource-variable/noto-sans-kr": "^5.3.1",
+    "@techstark/opencv-js": "4.12.0-release.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

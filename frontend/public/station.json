@@ -1,0 +1,11 @@
+{
+  "tagSideM": 0.16,
+  "tags": [
+    { "id": 0, "center": [-0.25, 0], "yawDeg": 0 },
+    { "id": 1, "center": [0.25, 1], "yawDeg": 0 },
+    { "id": 2, "center": [-0.25, 2], "yawDeg": 0 },
+    { "id": 3, "center": [1, 2.25], "yawDeg": 90 }
+  ],
+  "route": [[0, 0], [0, 2], [1.75, 2]],
+  "camera": { "diagonalFovDeg": 70, "calibration": null }
+}

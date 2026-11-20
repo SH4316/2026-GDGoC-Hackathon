@@ -1,75 +1,65 @@
-# 인증 앱
+# 지하철 환승 통로 AR PoC
 
-`backend`는 NestJS TypeScript 프로젝트이며 `src/auth`의 `AuthModule`에서 계정 검증과 세션을 처리합니다. `frontend`는 Vite React TypeScript 프로젝트이며 로그인 화면과 API 연동을 `src/features/auth`에 둡니다.
+스마트폰에서 주소를 열고 브라우저의 카메라 권한을 허용하면 후면 영상이 바로 열린다. 등록된 AprilTag가 보이면 스마트폰의 위치를 통로 좌표계에서 추정하고, 진행할 방향을 바닥 화살표 하나로 표시한다. 영상 처리와 위치 계산은 스마트폰 안에서 실행한다.
 
-## Docker Compose로 실행
+## 바닥에 놓을 것
 
-Docker Engine과 Docker Compose 플러그인이 설치된 환경에서 실행합니다.
+준비물은 스마트폰, A4 출력물, 줄자, 종이를 평평하게 고정할 테이프다. 평평한 바닥에서 출발점과 코너를 정하면 된다. 기본 코스는 **직진 2.00 m 후 오른쪽으로 1.75 m**다.
+
+1. [태그·보정판 PDF](experiments/corridor/field-kit.pdf)에서 1~4쪽을 A4 **실제 크기 100%**로 인쇄한다. 검은 정사각형의 한 변은 160 mm, 아래 검산선은 100 mm다. 흰 여백을 보존한다.
+2. 바닥 출발점을 원점으로 잡는다. 출발할 때 정면을 +Y, 오른쪽을 +X로 두고 아래 위치에 **검은 정사각형의 중심**을 맞춘다. 종이의 ‘UP’ 쪽을 표의 방향으로 놓는다.
+3. 바닥에 코너 (0, 2)와 도착점 (1.75, 2)를 표시한다. 다른 통로에 맞출 때는 실측한 태그 중심, 방향, 경로 꼭짓점을 [배치 파일](frontend/public/station.json)에 입력한다. 단위는 m이며 태그 회전은 +Y에서 시계 방향이다.
+
+| 태그 ID | X (m) | Y (m) | 인쇄물 위쪽 |
+| --- | ---: | ---: | --- |
+| 0 | −0.25 | 0 | 정면 (+Y) |
+| 1 | +0.25 | 1 | 정면 (+Y) |
+| 2 | −0.25 | 2 | 정면 (+Y) |
+| 3 | 1 | 2.25 | 오른쪽 (+X) |
+
+## 스마트폰 실행
+
+Docker와 Compose가 있는 컴퓨터에서 아래 명령을 실행한다. 두 번째 명령의 로그에 나오는 HTTPS 주소를 스마트폰에서 연다. 로컬 포트의 기본값은 8080이다. 배치를 변경한 뒤에는 첫 번째 명령으로 다시 빌드한다.
 
 ```bash
 ./scripts/compose-up.sh
+docker compose logs cloudflared
 ```
 
-첫 실행은 프로젝트 루트의 `.env`에 로그인 계정, 임의 로그인 비밀번호와 MySQL 비밀번호를 생성합니다. 이후 실행에는 같은 파일을 사용합니다. 아래 명령으로 생성된 로그인 계정을 확인할 수 있습니다.
+기본 후면 렌즈를 태그와 그 앞의 바닥이 함께 보이게 기울인다. 출발점에서 정면 화살표, 코너에 접근하면 오른쪽 화살표를 확인한다. 화살표를 그릴 바닥 위치가 화면 밖에 있거나 태그를 놓치면 영상만 보인다. 카메라 권한을 거부했다면 브라우저 사이트 설정에서 허용하고 화면을 한 번 누르거나 새로고침한다. 모바일 카메라 접근에는 HTTPS가 필요하다. [미디어 캡처 명세](https://www.w3.org/TR/mediacapture-streams/)
 
-```bash
-sed -n -e '/^AUTH_EMAIL=/p' -e '/^COMPOSE_AUTH_PASSWORD=/p' .env
-```
-
-로컬에서는 `http://localhost:8080`을 엽니다. 로컬 포트를 변경하려면 `.env`에 `APP_PORT`를 지정합니다. 외부에서 접속할 때는 아래 로그에 표시되는 `https://…trycloudflare.com` 주소를 사용합니다. Quick Tunnel은 Cloudflare 계정이나 도메인 없이 시작하며, 터널을 다시 만들면 주소가 바뀝니다. [Cloudflare Quick Tunnel 문서](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/)
-
-```bash
-docker compose logs -f cloudflared
-```
-
-Nginx가 프런트엔드를 제공하고 같은 호스트의 `/api/` 요청을 NestJS로 전달합니다. 터널은 Nginx로 연결됩니다. MySQL 8.4는 `db:3306`에서 백엔드에 제공되며, 데이터는 `mysql-data` 볼륨에 보존됩니다. 백엔드 컨테이너에는 `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`가 설정됩니다. 현재 로그인은 환경 변수의 계정과 메모리 세션을 사용합니다.
-
-MySQL 콘솔에서 `hackathon` 데이터베이스를 확인하려면 다음 명령을 실행하고 `.env`의 `MYSQL_PASSWORD`를 입력합니다.
-
-```bash
-docker compose exec db sh -c 'exec mysql -u "$MYSQL_USER" -p "$MYSQL_DATABASE"'
-```
-
-종료하려면 `docker compose down`을 실행합니다. MySQL 볼륨과 `.env`는 다음 실행에서 재사용합니다.
-
-## Node.js로 로컬 개발
-
-Node.js 24 LTS(24.15 이상)와 npm을 사용합니다.
-
-터미널 1에서 계정을 설정하고 백엔드를 실행합니다.
-
-```bash
-cd backend
-npm ci
-cp -n .env.example .env
-read -rsp '비밀번호 (12~128자): ' login_password
-printf '\n'
-printf '%s' "$login_password" | npm run --silent auth:hash
-unset login_password
-```
-
-`backend/.env`에 사용할 이메일(`AUTH_EMAIL`)과 출력된 해시(`AUTH_PASSWORD_HASH`)를 넣습니다. 설정 가능한 계정은 한 개입니다.
-
-```bash
-npm run start:dev
-```
-
-터미널 2에서 프런트엔드를 실행한 뒤 브라우저에서 `http://localhost:5173`을 엽니다.
+로컬 개발은 Node.js 24.15 이상에서 다음과 같이 실행한다. 브라우저 주소는 Vite가 출력하는 localhost 주소다.
 
 ```bash
 cd frontend
 npm ci
+npm test
 npm run dev
 ```
 
-Vite는 `/api`를 `http://127.0.0.1:3000`으로 전달합니다. 백엔드 포트를 바꾸면 프런트엔드 실행 시 `API_PROXY_TARGET`도 새 주소로 설정합니다.
+## 위치와 화살표 계산
 
-## 인증 API
+- 워커가 OpenCV.js로 `tag36h11`의 ID와 네 꼭짓점을 검출한다. 지도에 등록된 태그의 3D 좌표로 PnP를 풀고 카메라 중심을 m 단위로 구한다. 여러 태그가 보이면 RANSAC 합의를 확인한다. 너무 작은 태그나 재투영 RMS가 2.5 px를 넘는 결과는 버린다. [OpenCV PnP](https://docs.opencv.org/4.12.0/d5/d1f/calib3d_solvePnP.html)
+- 위치를 경로에 투영해 앞쪽에 있는 고정 화살표를 고른다. 기본 설정에서는 같은 평면에 놓인 태그로 바닥과 영상 사이의 호모그래피를 구해 화살표 꼭짓점을 그린다. 추적이 끊긴 프레임에서는 즉시 지우며, 새 결과가 멎어도 마지막 프레임 시각에서 350 ms 후 지운다. [OpenCV 평면 호모그래피](https://docs.opencv.org/4.12.0/d9/dab/tutorial_homography.html)
+- 기본 대각 화각 70°는 기기 보정 전의 가정이므로 카메라 위치 수치와 화살표 선택 시점에는 기기별 오차가 있다. 빌드는 카메라와 정적 파일만 사용한다.
 
-| 메서드 | 경로 | 동작 |
-| --- | --- | --- |
-| `POST` | `/api/auth/login` | JSON `{ email, password }`를 검증하고 세션 쿠키와 사용자 이메일을 반환합니다. |
-| `GET` | `/api/auth/session` | 세션이 유효하면 사용자 이메일을 반환합니다. |
-| `POST` | `/api/auth/logout` | JSON `{}`를 받아 세션과 쿠키를 삭제합니다. |
+## 현장 확인
 
-세션은 8시간 동안 유효하며 백엔드를 재시작하면 삭제됩니다. 두 프로젝트 모두 `npm run build`로 빌드할 수 있습니다. 배포 시 프런트엔드와 `/api`를 같은 HTTPS 출처로 제공하고 백엔드에 `NODE_ENV=production`을 지정하면 `Secure` 세션 쿠키를 사용합니다.
+1. 출발점 (0, 0)과 코너 (0, 2)에서 후면 렌즈를 바닥 표식 수직 위에 들고, 각각 세 번 멈춘다. 원격 브라우저 개발자도구에서 아래 코드를 실행해 태그 ID와 위치를 읽을 수 있다. 위치의 앞 두 성분을 줄자로 잰 X·Y와 비교한다.
+2. 폰을 기울였을 때 화살표가 같은 바닥 지점을 가리키는지 확인한다. 알려진 태그를 모두 가렸다가 다시 비춰 화살표 소실과 재등장을 확인한다. 도착점에 서면 화살표가 사라진다.
+
+```js
+window.addEventListener('station-pose', ({ detail }) => console.log(detail));
+```
+
+검출 결과는 `positionM` (X, Y, 바닥 위 높이), `tagIds`, `reprojectionPx`, `frameTimeMs`를 담는다. 추적 소실 이벤트의 값은 `null`이다. 재투영 오차 단위는 px이며, 현장 수평 위치 오차는 바닥 표식과의 거리로 확인한다.
+
+### 특정 스마트폰을 보정할 때
+
+PDF 5쪽의 보정판을 평평하게 붙인다. 실험에 쓸 후면 **영상 스트림**에서 줌, 해상도 비율, 화면 방향을 고정하고 보정판이 전부 보이는 프레임 15장 이상을 저장한다. 중앙과 네 모서리에서 거리와 기울기를 바꾼다. 영상 프레임은 원격 개발자도구에서 `document.querySelector('video')`를 원래 `videoWidth × videoHeight` 크기로 캔버스에 복사해 얻을 수 있다.
+
+```bash
+uv run experiments/corridor/calibrate.py /path/to/frames/*.jpg
+```
+
+출력한 JSON을 배치 파일의 `camera.calibration`에 넣고 다시 빌드한다. 보정 후에는 위치와 화살표 모두 실측 초점거리, 주점, 왜곡 계수를 사용한다. 실험 영상과 보정 영상의 방향이나 종횡비가 달라지면 같은 조건으로 다시 보정한다. [OpenCV 카메라 보정](https://docs.opencv.org/4.12.0/d4/d94/tutorial_camera_calibration.html)

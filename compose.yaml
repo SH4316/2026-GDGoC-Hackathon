@@ -1,58 +1,10 @@
 services:
-  db:
-    image: mysql:8.4
-    environment:
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-hackathon}
-      MYSQL_USER: ${MYSQL_USER:-hackathon}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Run scripts/compose-up.sh first}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Run scripts/compose-up.sh first}
-      MYSQL_ROOT_HOST: localhost
-    volumes:
-      - mysql-data:/var/lib/mysql
-    networks:
-      - database
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
-      interval: 5s
-      timeout: 3s
-      retries: 15
-      start_period: 30s
-
-  backend:
-    build: ./backend
-    environment:
-      NODE_ENV: production
-      BIND_HOST: 0.0.0.0
-      AUTH_EMAIL: ${AUTH_EMAIL:?Run scripts/compose-up.sh first}
-      AUTH_PASSWORD_HASH: ${AUTH_PASSWORD_HASH:?Run scripts/compose-up.sh first}
-      DB_HOST: db
-      DB_PORT: "3306"
-      DB_NAME: ${MYSQL_DATABASE:-hackathon}
-      DB_USER: ${MYSQL_USER:-hackathon}
-      DB_PASSWORD: ${MYSQL_PASSWORD:?Run scripts/compose-up.sh first}
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - default
-      - database
-    healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/auth/session').then(response => process.exit(response.status === 401 ? 0 : 1))"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-      start_period: 10s
-
   web:
     build: ./frontend
     ports:
       - "127.0.0.1:${APP_PORT:-8080}:80"
-    depends_on:
-      backend:
-        condition: service_healthy
-        restart: true
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/station.json"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -63,10 +15,3 @@ services:
     depends_on:
       web:
         condition: service_healthy
-
-networks:
-  database:
-    internal: true
-
-volumes:
-  mysql-data:
