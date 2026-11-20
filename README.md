@@ -21,21 +21,21 @@
 
 A4 인쇄용 PNG는 300 dpi다. [태그 0](experiments/corridor/images/tag-0.png) · [태그 1](experiments/corridor/images/tag-1.png) · [태그 2](experiments/corridor/images/tag-2.png) · [태그 3](experiments/corridor/images/tag-3.png) · [보정판](experiments/corridor/images/calibration-board.png)
 
-## HTTP로 실행
+## Docker Compose로 HTTPS 실행
 
-### Docker Compose
+`home.soohyuk.dev`가 가리키는 호스트에서 TCP 80과 443을 Docker에 할당하고 외부에서 접근할 수 있게 한다. 공유기 뒤에 있다면 두 포트를 호스트로 전달한다. 호스트의 Nginx 등에서 이미 포트를 사용 중이면 Compose를 시작하기 전에 두 포트를 비운다. [Caddy 자동 HTTPS](https://caddyserver.com/docs/automatic-https)
 
-Docker Engine과 Docker Compose가 실행 가능한 PC에서 저장소 루트의 스크립트를 실행한다.
+호스트에서 저장소 루트로 이동해 실행한다.
 
 ```bash
-./scripts/compose-up.sh
+docker compose up --build -d --remove-orphans
 ```
 
-스크립트는 `docker compose up --build --wait --remove-orphans`를 실행한다. 프런트엔드를 빌드하고 Nginx가 `station.json`을 제공할 때까지 기다린다. 같은 Compose 프로젝트에서 이전 tunnel처럼 현재 설정에서 빠진 서비스의 컨테이너를 정리한다.
+Caddy가 `home.soohyuk.dev` 인증서를 발급하고 갱신하며 HTTP 요청을 HTTPS로 보낸다. 최초 발급은 컨테이너가 시작된 뒤 진행된다. `docker compose logs -f caddy`에서 확인하고 휴대폰으로 [https://home.soohyuk.dev](https://home.soohyuk.dev)를 연다. `docker compose down`으로 종료해도 인증서는 `caddy_data` 볼륨에 보관된다. [Caddy Docker 이미지](https://hub.docker.com/_/caddy)
 
-PC에서는 `http://localhost:8080`, 같은 네트워크의 다른 기기에서는 `http://<PC의 IP>:8080`을 연다. 포트를 바꾸려면 `APP_PORT=8090 ./scripts/compose-up.sh`로 실행한다. 종료는 `docker compose down`이다.
+`./scripts/compose-up.sh`로도 시작할 수 있다. 호스트에서 직접 확인할 때는 `http://localhost:8080`을 연다. `APP_PORT`는 이 로컬 HTTP 포트를 바꾼다.
 
-### Vite 개발 서버
+## Vite 개발 서버
 
 Bash와 Node.js 24.15 이상(npm 포함)이 있는 PC에서 저장소 루트의 스크립트를 실행한다. 첫 실행 시 의존성을 설치하고 Vite를 `0.0.0.0:8080`에서 시작한다.
 
@@ -57,9 +57,20 @@ adb reverse tcp:8080 tcp:8080
 
 기본 후면 렌즈를 태그와 그 앞의 바닥이 함께 보이게 기울인다. 출발점에서 정면 화살표, 코너에 접근하면 오른쪽 화살표를 확인한다. 화살표를 그릴 바닥 위치가 화면 밖에 있거나 태그를 놓치면 영상만 보인다. 카메라 권한을 거부했다면 브라우저 사이트 설정에서 허용하고 화면을 한 번 누르거나 새로고침한다. [합성 시험 영상으로 캡처한 직진·우회전 AR 화면](experiments/corridor/images/ar-camera.png)
 
-### 고정 도메인에서 Certbot으로 HTTPS 실행
+### npm 개발 명령
 
-`home.soohyuk.dev`의 원본 호스트에서 실행한다. Ubuntu와 같은 systemd 환경에서 Bash, Node.js 24.15 이상(npm 포함), Nginx, Certbot의 Nginx 플러그인, `sudo` 권한이 필요하다. Ubuntu에서는 다음과 같이 설치한다.
+개발 서버(`npm run dev`, 기본 5173)와 빌드 미리보기(`npm run build` 후 `npm run preview`, 기본 4173)도 `0.0.0.0`에서 수신한다.
+
+```bash
+cd frontend
+npm ci
+npm test
+npm run dev
+```
+
+## 호스트 Nginx와 Certbot으로 HTTPS 실행
+
+호스트 Nginx로 직접 배포하는 경우에는 이 절차를 사용한다. Compose의 Caddy와 호스트 Nginx 중 TCP 80과 443을 사용할 서비스를 하나 선택한다. `home.soohyuk.dev`의 원본 호스트에서 실행한다. Ubuntu와 같은 systemd 환경에서 Bash, Node.js 24.15 이상(npm 포함), Nginx, Certbot의 Nginx 플러그인, `sudo` 권한이 필요하다. Ubuntu에서는 다음과 같이 설치한다.
 
 ```bash
 sudo apt update
@@ -79,17 +90,6 @@ sudo apt install nginx certbot python3-certbot-nginx
 ```bash
 systemctl status certbot.timer
 sudo certbot renew --cert-name 2026-hackathon-2-home.soohyuk.dev --dry-run
-```
-
-### npm 개발 명령
-
-개발 서버(`npm run dev`, 기본 5173)와 빌드 미리보기(`npm run build` 후 `npm run preview`, 기본 4173)도 `0.0.0.0`에서 수신한다.
-
-```bash
-cd frontend
-npm ci
-npm test
-npm run dev
 ```
 
 ## 위치와 화살표 계산

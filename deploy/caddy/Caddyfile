@@ -1,0 +1,3 @@
+home.soohyuk.dev {
+	reverse_proxy web:80
+}
