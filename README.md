@@ -21,20 +21,33 @@
 
 A4 인쇄용 PNG는 300 dpi다. [태그 0](experiments/corridor/images/tag-0.png) · [태그 1](experiments/corridor/images/tag-1.png) · [태그 2](experiments/corridor/images/tag-2.png) · [태그 3](experiments/corridor/images/tag-3.png) · [보정판](experiments/corridor/images/calibration-board.png)
 
-## 스마트폰 실행
+## HTTP로 실행
 
-Docker와 Compose가 있는 컴퓨터에서 아래 명령을 실행한다. 웹 서버는 기본적으로 `0.0.0.0:8080`에서 수신한다. 스마트폰에서 AR 카메라를 사용할 때는 두 번째 명령의 로그에 나오는 HTTPS 주소를 연다. 배치를 변경한 뒤에는 첫 번째 명령으로 다시 빌드한다.
+Bash와 Node.js 24.15 이상(npm 포함)이 있는 PC에서 저장소 루트의 스크립트를 실행한다. 첫 실행 시 의존성을 설치하고 Vite를 `0.0.0.0:8080`에서 시작한다.
 
 ```bash
-./scripts/compose-up.sh
-docker compose logs cloudflared
+./scripts/start.sh
 ```
 
-기본 후면 렌즈를 태그와 그 앞의 바닥이 함께 보이게 기울인다. 출발점에서 정면 화살표, 코너에 접근하면 오른쪽 화살표를 확인한다. 화살표를 그릴 바닥 위치가 화면 밖에 있거나 태그를 놓치면 영상만 보인다. 카메라 권한을 거부했다면 브라우저 사이트 설정에서 허용하고 화면을 한 번 누르거나 새로고침한다. 모바일 카메라 접근에는 HTTPS가 필요하다. [미디어 캡처 명세](https://www.w3.org/TR/mediacapture-streams/)
+PC에서는 `http://localhost:8080`을 연다. 같은 네트워크에서는 터미널의 `Network` 주소로 페이지에 접속할 수 있다. 포트를 바꾸려면 `APP_PORT=8090 ./scripts/start.sh`로 실행한다. 종료는 `Ctrl+C`다.
 
-[합성 시험 영상으로 캡처한 직진·우회전 AR 화면](experiments/corridor/images/ar-camera.png)
+### 스마트폰에서 카메라 사용
 
-로컬 개발은 Node.js 24.15 이상에서 다음과 같이 실행한다. 개발 서버(`npm run dev`, 기본 5173)와 빌드 미리보기(`npm run build` 후 `npm run preview`, 기본 4173)는 모두 `0.0.0.0`에서 수신한다. 같은 네트워크에서 페이지를 확인하려면 Vite가 출력한 `Network` 주소를 연다.
+모바일 브라우저는 일반 LAN IP의 HTTP 페이지에서 카메라 접근을 제한한다. Android에서는 USB 포트 전달로 휴대폰의 `localhost`에서 카메라를 쓸 수 있다. PC에 Android SDK Platform Tools를 설치하고, 휴대폰의 USB 디버깅을 켜고 PC 연결을 허용한 뒤 **두 번째 터미널**에서 실행한다. [보안 컨텍스트 명세](https://www.w3.org/TR/secure-contexts/#is-origin-trustworthy) · [Android ADB 포트 전달](https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/docs/user/adb.1.md#networking)
+
+```bash
+adb reverse tcp:8080 tcp:8080
+```
+
+휴대폰의 Chrome에서 `http://localhost:8080`을 열고 카메라를 허용한다. PC 서버 포트를 변경했다면 명령의 두 번째 포트를 그 값으로 바꾼다.
+
+기본 후면 렌즈를 태그와 그 앞의 바닥이 함께 보이게 기울인다. 출발점에서 정면 화살표, 코너에 접근하면 오른쪽 화살표를 확인한다. 화살표를 그릴 바닥 위치가 화면 밖에 있거나 태그를 놓치면 영상만 보인다. 카메라 권한을 거부했다면 브라우저 사이트 설정에서 허용하고 화면을 한 번 누르거나 새로고침한다. [합성 시험 영상으로 캡처한 직진·우회전 AR 화면](experiments/corridor/images/ar-camera.png)
+
+기존 Docker Compose로 HTTPS 접속이 필요할 때는 `./scripts/compose-up.sh`를 실행하고 `docker compose logs cloudflared`에 출력되는 주소를 연다.
+
+### npm 개발 명령
+
+개발 서버(`npm run dev`, 기본 5173)와 빌드 미리보기(`npm run build` 후 `npm run preview`, 기본 4173)도 `0.0.0.0`에서 수신한다.
 
 ```bash
 cd frontend

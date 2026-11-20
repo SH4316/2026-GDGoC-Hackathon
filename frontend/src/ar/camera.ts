@@ -118,7 +118,9 @@ export function openPassage(video: HTMLVideoElement, overlay: HTMLCanvasElement)
     const token = ++generation;
     opening = true;
     try {
-      if (!navigator.mediaDevices?.getUserMedia) throw new Error('후면 카메라에는 HTTPS 연결이 필요합니다.');
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('카메라를 사용할 수 없습니다. 지원 브라우저에서 localhost 또는 HTTPS 주소로 접속하세요.');
+      }
       const camera = await navigator.mediaDevices.getUserMedia({ audio: false,
         video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } });
       if (token !== generation) { camera.getTracks().forEach((track) => track.stop()); return; }
