@@ -1,5 +1,5 @@
 import {
-  BadGatewayException, GatewayTimeoutException, HttpException, HttpStatus, ServiceUnavailableException,
+  BadGatewayException, HttpException, HttpStatus, ServiceUnavailableException,
 } from '@nestjs/common';
 import { z } from 'zod';
 
@@ -32,6 +32,8 @@ export interface DirectionsProvider {
   findRoute(mode: RouteMode, endpoints: Endpoints): Promise<RouteResult>;
 }
 
+export class TemporaryProviderError extends HttpException {}
+
 export async function requestJson(url: URL, options: RequestInit): Promise<{ status: number; body: unknown }> {
   const signal = AbortSignal.timeout(10_000);
   try {
@@ -39,14 +41,16 @@ export async function requestJson(url: URL, options: RequestInit): Promise<{ sta
     if (response.status === 204) return { status: 204, body: null };
     const body: unknown = response.ok ? await response.json() : await response.json().catch(() => null);
     return { status: response.status, body };
-  } catch {
-    if (signal.aborted) throw new GatewayTimeoutException('Directions provider request timed out');
-    throw new BadGatewayException('Could not read the directions provider response');
+  } catch (error) {
+    if (signal.aborted) throw new TemporaryProviderError('Directions provider request timed out', HttpStatus.GATEWAY_TIMEOUT);
+    if (error instanceof SyntaxError) throw new BadGatewayException('Could not read the directions provider response');
+    throw new TemporaryProviderError('Could not read the directions provider response', HttpStatus.BAD_GATEWAY);
   }
 }
 
 export function providerError(status: number) {
-  if (status === 429) return new HttpException('Directions provider request limit reached', HttpStatus.TOO_MANY_REQUESTS);
+  if (status === 429) return new TemporaryProviderError('Directions provider request limit reached', HttpStatus.TOO_MANY_REQUESTS);
+  if (status >= 500) return new TemporaryProviderError('Directions provider could not process the request', HttpStatus.BAD_GATEWAY);
   if (status === 401 || status === 403) {
     return new ServiceUnavailableException('Check the directions provider API key and product permissions');
   }

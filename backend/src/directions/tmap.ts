@@ -1,6 +1,6 @@
-import { BadGatewayException, BadRequestException, GatewayTimeoutException } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, HttpStatus } from '@nestjs/common';
 import { z } from 'zod';
-import { coordinate, providerError, requestJson } from './provider.js';
+import { coordinate, providerError, requestJson, TemporaryProviderError } from './provider.js';
 import type { DirectionsProvider, Endpoints, GeoPoint, Place, RouteMode, RouteStep } from './provider.js';
 
 const origin = 'https://apis.openapi.sk.com';
@@ -198,7 +198,7 @@ export class TmapDirections implements DirectionsProvider {
     } : { headers });
     if (status === 204) return null;
     const code = transitErrorSchema.safeParse(body).data?.result.status;
-    if (code === 31) throw new GatewayTimeoutException('TMAP request timed out');
+    if (code === 31) throw new TemporaryProviderError('TMAP request timed out', HttpStatus.GATEWAY_TIMEOUT);
     if (status === 400 && code !== undefined && [21, 22, 23, 24].includes(code)) {
       throw new BadRequestException('TMAP rejected the route parameters');
     }

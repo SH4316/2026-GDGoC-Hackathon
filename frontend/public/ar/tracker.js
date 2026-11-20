@@ -3,7 +3,9 @@
 
 let lib, detector, highlightLut, station, anchors, segments;
 let reportedFrameError = false;
-let layouts, tagSpaces;
+let layouts, tagSpaces, trees;
+let activePoints = [], activeNodes = [], activeEdges = new Map(), routeRevision = 0;
+let incident = [];
 let floorReference;
 let lastTagPose, unconfirmedTagPose;
 
@@ -52,14 +54,10 @@ function configure(map) {
   }
   if (!Array.isArray(map.route) || map.route.length === 1 || !map.route.every(xy))
     throw new Error('station.json: 바닥 경로 좌표를 확인하세요.');
-  segments = [];
-  let along = 0;
-  for (let i = 1; i < map.route.length; i++) {
-    const a = map.route[i-1], b = map.route[i], length = distance(a, b);
-    if (length < .05) throw new Error('station.json: 인접 경로점이 너무 가깝습니다.');
-    segments.push({ a, length, along, dx: (b[0]-a[0])/length, dy: (b[1]-a[1])/length });
-    along += length;
-  }
+  const tree = trees.get(map);
+  incident = tree ? tree.points.map(() => []) : [];
+  for (const [a, b] of tree?.edges ?? []) { incident[a].push(b); incident[b].push(a); }
+  setPath([], tree || map.tagGraph ? [] : map.route);
   const cal = map.camera.calibration;
   if (cal) {
     if (![cal.width, cal.height, cal.fx, cal.fy].every(n => Number.isFinite(n) && n > 0)
@@ -69,6 +67,66 @@ function configure(map) {
     throw new Error('station.json: 후면 카메라의 대각 화각을 확인하세요.');
   }
   station = map;
+}
+
+function setPath(nodes, points) {
+  activeNodes = nodes;
+  activePoints = points;
+  activeEdges = new Map(nodes.slice(1).map((node, i) => [nodes[i] + '/' + node, i]));
+  routeRevision++;
+  segments = [];
+  let along = 0;
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i-1], b = points[i], length = distance(a, b);
+    if (length < .05 - 1e-8) throw new Error('station.json: 인접 경로점이 너무 가깝습니다.');
+    const dx = (b[0]-a[0])/length, dy = (b[1]-a[1])/length, previous = segments.at(-1);
+    let turn;
+    if (previous) {
+      const angle = Math.atan2(previous.dx*dy - previous.dy*dx, previous.dx*dx + previous.dy*dy);
+      if (Math.abs(angle) >= Math.PI / 5) turn = Math.abs(angle) > Math.PI * .85 ? 'uturn' : angle > 0 ? 'left' : 'right';
+    }
+    // Collinear route vertices describe a single straight instruction.
+    const section = turn ? i - 1 : previous?.section ?? 0;
+    segments.push({ a, length, along, dx, dy, turn, section });
+    along += length;
+  }
+}
+
+// Project the camera only onto passages incident to the observed tag. At a fork,
+// walking partway along either direction of that edge has a different remaining cost.
+function selectPath(tree, tags, position) {
+  const tag = tags.reduce((best, t) => distance(t.center, position) < distance(best.center, position) ? t : best);
+  const node = tree.anchors[tag.id];
+  if (!Number.isFinite(tree.costs[node])) {
+    if (activeNodes.length) setPath([], []);
+    return;
+  }
+  let from = node, toward = -1, nearest = Infinity;
+  for (const other of incident[node]) {
+    const a = tree.points[node], b = tree.points[other];
+    const length = distance(a, b), dx = (b[0] - a[0]) / length, dy = (b[1] - a[1]) / length;
+    const along = Math.min(length, Math.max(0, (position[0] - a[0]) * dx + (position[1] - a[1]) * dy));
+    const gap = distance(position, [a[0] + along * dx, a[1] + along * dy]);
+    if (gap >= nearest) continue;
+    nearest = gap;
+    // On a shortest-tree edge always follow its downhill direction, including at an endpoint tie.
+    if (along < .05 || length - along < .05) {
+      from = along < .05 ? node : other;
+      toward = tree.next[from];
+      continue;
+    }
+    const goToNode = tree.next[other] === node || (tree.next[node] !== other &&
+      along + tree.costs[node] < length - along + tree.costs[other]);
+    from = goToNode ? other : node;
+    toward = goToNode ? node : other;
+  }
+  if (toward < 0 && activeNodes.at(-1) === from) return activeNodes.length - 2;
+  const existing = activeEdges.get(from + '/' + toward);
+  if (existing !== undefined) return existing;
+  const nodes = [from];
+  for (let i = toward; i >= 0; i = tree.next[i]) nodes.push(i);
+  setPath(nodes, nodes.map(i => tree.points[i]));
+  return 0;
 }
 
 function cameraIntrinsics(w, h, layout = station) {
@@ -162,19 +220,35 @@ function correspondences(tags, own) {
   };
 }
 
-function arrowAt(position, tags, project, bounds) {
-  if (!segments.length) return null;
-  let progress = 0, nearest = Infinity;
-  for (const seg of segments) {
+function routePosition(position, observedSegment) {
+  let progress = 0, nearest = Infinity, index = 0;
+  for (const [i, seg] of segments.entries()) {
+    if (observedSegment !== undefined && i !== observedSegment) continue;
     const t = Math.min(seg.length, Math.max(0, (position[0]-seg.a[0])*seg.dx + (position[1]-seg.a[1])*seg.dy));
     const d = distance(position, [seg.a[0]+seg.dx*t, seg.a[1]+seg.dy*t]);
-    if (d < nearest) { nearest = d; progress = seg.along + t; }
+    if (d < nearest) { nearest = d; progress = seg.along + t; index = i; }
   }
   if (nearest > 1.5) return null;
+  // Allow a small overshoot past the vertex: the next segment may already be the nearest.
+  let maneuver = { kind: 'straight', index: segments[index].section };
+  let closestTurn = Infinity;
+  for (const [corner, next] of segments.entries()) {
+    if (!next.turn) continue;
+    const ahead = next.along - progress;
+    if (ahead < -.6 || ahead > 1.2 || Math.abs(ahead) >= closestTurn) continue;
+    closestTurn = Math.abs(ahead);
+    maneuver = { kind: next.turn, index: corner };
+  }
+  return { progress, segment: segments[index], maneuver };
+}
+
+function arrowAt(route, tags, project, bounds) {
+  if (!route) return null;
   const shape = [[-.048,-.20],[.048,-.20],[.048,.015],[.12,.015],[0,.20],[-.12,.015],[-.048,.015]];
-  for (const seg of segments) {
+  for (const [i, seg] of segments.entries()) {
+    if (route.maneuver.kind !== 'straight' && i < route.maneuver.index) continue;
     for (let t = 0; t < seg.length - .2; t += .65) {
-      const ahead = seg.along + t - progress;
+      const ahead = seg.along + t - route.progress;
       if (ahead < .15 || ahead > 2.5) continue;
       const center = [seg.a[0]+t*seg.dx, seg.a[1]+t*seg.dy];
       if (tags.every(tag => distance(tag.center, center) > 1.1)) continue;
@@ -186,6 +260,64 @@ function arrowAt(position, tags, project, bounds) {
     }
   }
   return null;
+}
+
+// A 9 cm stripe in the station's floor coordinates. Only project the nearby
+// part of the route, and clip faces before perspective division at the camera.
+function guideAt(route, project, depth) {
+  if (!route) return [];
+  const halfWidth = .045, near = .1;
+  const from = route.progress - .45, to = route.progress + 4;
+  const faces = [];
+  function addFace(face) {
+    const clipped = [];
+    let a = face.at(-1), za = depth(a);
+    for (const b of face) {
+      const zb = depth(b);
+      if ((za >= near) !== (zb >= near)) {
+        const t = (near - za) / (zb - za);
+        clipped.push([a[0] + t*(b[0]-a[0]), a[1] + t*(b[1]-a[1])]);
+      }
+      if (zb >= near) clipped.push(b);
+      a = b; za = zb;
+    }
+    if (clipped.length >= 3) faces.push(clipped);
+  }
+  for (const seg of segments) {
+    if (seg.along >= to) break;
+    const start = Math.max(0, from - seg.along), end = Math.min(seg.length, to - seg.along);
+    if (start >= end) continue;
+    const edge = (t, side) => [seg.a[0] + seg.dx*t - side*seg.dy*halfWidth,
+      seg.a[1] + seg.dy*t + side*seg.dx*halfWidth];
+    // Short faces follow curved lens distortion when the camera is calibrated.
+    for (let t = start; t < end; t += .5) {
+      const next = Math.min(t + .5, end);
+      addFace([edge(t, 1), edge(t, -1), edge(next, -1), edge(next, 1)]);
+    }
+    if (start === 0 && seg.along > from && seg.along > 0) {
+      addFace(Array.from({ length: 12 }, (_, i) => {
+        const angle = i * Math.PI / 6;
+        return [seg.a[0] + halfWidth*Math.cos(angle), seg.a[1] + halfWidth*Math.sin(angle)];
+      }));
+    }
+  }
+  if (!faces.length) return [];
+  const pixels = project(faces.flat());
+  if (!pixels) return [];
+  let index = 0;
+  return faces.map(face => {
+    const polygon = pixels.slice(index, index + face.length);
+    index += face.length;
+    return polygon;
+  }).filter(polygon => polygon.every(xy));
+}
+
+function projectFloor(points, K, dist, r, t, own) {
+  const xyz = own(lib.matFromArray(points.length, 1, lib.CV_64FC3, points.flatMap(([x,y]) => [x,y,0])));
+  const uv = own(new lib.Mat());
+  lib.projectPoints(xyz, r, t, K, dist, uv);
+  const pixels = uv.data64F;
+  return points.map((_, i) => [pixels[i*2], pixels[i*2+1]]);
 }
 
 function cameraMatrix([fx, fy, cx, cy], own) {
@@ -256,7 +388,7 @@ function measureFloor(ref, gray, intrinsics, K, dt, own) {
   const m = ref.cameraToWorld;
   if (!pose.position.every(Number.isFinite) || z < .12 || z > 3.2 || Math.abs(z-m[11]) > .08 + dt ||
       Math.hypot(x-m[3], y-m[7]) > .05 + dt * 3.5) return;
-  return { pose, landmarks: tracked };
+  return { pose, landmarks: tracked, r, t };
 }
 
 function updateFloor(gray, result, timeMs, floorAnchor, selection, own) {
@@ -277,7 +409,8 @@ function updateFloor(gray, result, timeMs, floorAnchor, selection, own) {
     if (!compatible || dt < 0 || dt > 1) {
       ref?.gray.delete(); floorReference = undefined; return;
     }
-    if (timeMs - ref.lastAttemptMs < 100 || floorAnchor?.spaceId !== spaceId || floorAnchor.timeMs !== ref.timeMs) return;
+    if (floorAnchor?.spaceId !== spaceId || floorAnchor.timeMs !== ref.timeMs) return;
+    if (timeMs - ref.lastAttemptMs < 100) { result.pendingFloorSpace = spaceId; return; }
     ref.lastAttemptMs = timeMs;
   }
   const [fx, fy, cx, cy] = cameraIntrinsics(gray.cols, gray.rows, layout);
@@ -299,13 +432,22 @@ function updateFloor(gray, result, timeMs, floorAnchor, selection, own) {
     camera = match.pose;
     landmarks = match.landmarks;
     result.floorMotion = { spaceId, referenceTimeMs: ref.timeMs, ...camera };
+    if (layout === station && segments.length && distance(camera.position, activePoints.at(-1)) >= .3) {
+      const m = camera.cameraToWorld;
+      const depth = ([x,y]) => (x-m[3])*m[2] + (y-m[7])*m[6] - m[11]*m[10];
+      const fullK = cameraMatrix([fx, fy, cx, cy], own);
+      const lens = coefficients ?? [0,0,0,0,0];
+      const dist = own(lib.matFromArray(lens.length, 1, lib.CV_64F, lens));
+      result.floorMotion.guide = guideAt(routePosition(camera.position),
+        points => projectFloor(points, fullK, dist, match.r, match.t, own), depth);
+    }
   }
   const retained = ref?.gray ?? new lib.Mat();
   small.copyTo(retained);
   floorReference = { spaceId, gray: retained, cameraToWorld: camera.cameraToWorld, timeMs, lastAttemptMs: timeMs, landmarks };
 }
 
-function track({ rgba, w, h, bounds = [0, 0, w, h], pinnedSpace, preferredSpace, frameTimeMs, floorAnchor, motionCamera }) {
+function track({ rgba, w, h, bounds = [0, 0, w, h], pinnedSpace, preferredSpace, frameTimeMs, floorAnchor, motionCamera, knownRoute }) {
   const owned = [];
   const own = (m) => { owned.push(m); return m; };
   const result = { type: 'frame', detections: [], fix: null };
@@ -333,8 +475,12 @@ function track({ rgba, w, h, bounds = [0, 0, w, h], pinnedSpace, preferredSpace,
       if (layout !== station) configure(layout);
       result.intrinsics = cameraIntrinsics(w, h);
       if (tags.length) {
-        const fix = locate(tags.map(tag => ({ ...tag, ...anchors.get(tag.id) })), bounds, result.intrinsics, own);
-        result.fix = confirmedTagPose(result.spaceId, fix, frameTimeMs);
+        const fix = locate(tags.map(tag => ({ ...tag, ...anchors.get(tag.id) })), bounds, result.intrinsics, own, result.spaceId, frameTimeMs);
+        result.fix = fix;
+        if (fix) {
+          result.routeRevision = routeRevision;
+          if (knownRoute !== routeRevision) result.route = activePoints;
+        }
       }
     } else if (tags.length) {
       result.candidates = candidates;
@@ -357,7 +503,7 @@ function track({ rgba, w, h, bounds = [0, 0, w, h], pinnedSpace, preferredSpace,
   return result;
 }
 
-function locate(tags, bounds, intrinsics, own) {
+function locate(tags, bounds, intrinsics, own, spaceId, frameTimeMs) {
   const K = cameraMatrix(intrinsics, own);
   const coefficients = station.camera.calibration?.distortion ?? [0,0,0,0,0];
   const dist = own(lib.matFromArray(coefficients.length, 1, lib.CV_64F, coefficients));
@@ -403,17 +549,37 @@ function locate(tags, bounds, intrinsics, own) {
       const z = H[6]*x + H[7]*y + H[8];
       return [(H[0]*x+H[1]*y+H[2])/z, (H[3]*x+H[4]*y+H[5])/z];
     });
-    const obj = own(lib.matFromArray(outline.length, 1, lib.CV_64FC3, outline.flatMap(([x,y]) => [x,y,0])));
-    const uv = own(new lib.Mat());
-    lib.projectPoints(obj, r, t, K, dist, uv);
-    return outline.map((_,i) => [uv.data64F[i*2], uv.data64F[i*2+1]]);
+    return projectFloor(outline, K, dist, r, t, own);
   }
-  const arrived = segments.length > 0 && distance(position, station.route.at(-1)) < .3;
-  return { position, cameraToWorld, ids: tags.map(tag => tag.id), rmsPx, arrived,
-    arrow: arrived ? null : arrowAt(position, tags, project, bounds) };
+  if (!confirmedTagPose(spaceId, { position }, frameTimeMs)) return null;
+  const tree = trees.get(station);
+  const observedSegment = tree && selectPath(tree, tags, position);
+  const route = routePosition(position, observedSegment);
+  const last = segments.at(-1);
+  const remaining = route ? last.along + last.length - route.progress : activePoints.length === 1 ? 0 : Infinity;
+  const endDistance = activePoints.length ? distance(position, activePoints.at(-1)) : Infinity;
+  const arrived = Math.max(remaining, endDistance) < .3;
+  // The rear lens can face back down the corridor while the position is on the route.
+  // A nearly vertical lens gives no usable horizontal bearing.
+  if (route?.maneuver.kind === 'straight') {
+    const x = cameraToWorld[2], y = cameraToWorld[6], horizontal = Math.hypot(x, y);
+    if (horizontal >= .3 && x * route.segment.dx + y * route.segment.dy < -.5 * horizontal)
+      route.maneuver = { kind: 'realign', index: route.segment.section };
+  }
+  return { position, cameraToWorld, ids: tags.map(tag => tag.id), rmsPx, arrived, destinationDistance: Math.max(remaining, endDistance), maneuver: route?.maneuver,
+    guide: arrived ? [] : guideAt(route, project, depth),
+    arrow: arrived ? null : arrowAt(route, tags, project, bounds) };
 }
 
 self.onmessage = ({ data }) => {
+  if (data.type === 'destination') {
+    const layout = layouts.get(data.spaceId);
+    if (layout) {
+      trees.set(layout, data.tree);
+      if (station === layout) configure(layout);
+    }
+    return;
+  }
   if (data.type === 'init') {
     function ready(cv) {
       try {
@@ -431,7 +597,9 @@ self.onmessage = ({ data }) => {
     }
     try {
       lastTagPose = unconfirmedTagPose = undefined;
-      layouts = new Map((data.spaces ?? [{ id: 'default', station: data.station }]).map(space => [space.id, space.station]));
+      const spaces = data.spaces ?? [{ id: 'default', station: data.station }];
+      layouts = new Map(spaces.map(space => [space.id, space.station]));
+      trees = new Map(spaces.filter(space => space.tree).map(space => [space.station, space.tree]));
       tagSpaces = new Map();
       for (const [id, layout] of layouts) {
         for (const tag of layout.tags) {

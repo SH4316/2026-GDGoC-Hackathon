@@ -1,8 +1,10 @@
+import { defaultWalk } from './tagRouting';
+
 export type Point = [number, number];
 export type TagModel = { file: string; name: string };
 export type Axis = [number, number, number];
 export type TagSurface = { heightM: number; right: Axis; up: Axis };
-export type StationTag = { surface?: TagSurface; id: number; center: Point; yawDeg: number; model?: TagModel; modelSizeM?: number };
+export type StationTag = { walkPoint?: Point; surface?: TagSurface; id: number; center: Point; yawDeg: number; model?: TagModel; modelSizeM?: number };
 export type Terrain = { name: string; outline?: Point[]; model?: TagModel };
 export type RailStop = { line: string; code: string; name: string };
 export type StationLink = RailStop & { routeEndpoint?: 'start' | 'end' };
@@ -12,6 +14,7 @@ export type Station = {
   tagSideM: number;
   tags: StationTag[];
   route: Point[];
+  tagGraph?: { startTag: number; endTag: number; edges: [number, number][] };
   terrain?: Terrain;
   camera: { diagonalFovDeg?: number; calibration?: {
     width: number; height: number; fx: number; fy: number; cx: number; cy: number; distortion: number[];
@@ -23,6 +26,14 @@ export function spaceLabel(station: Station) {
   const name = station.terrain?.name ?? '기본 공간';
   const links = station.stationLinks?.map(stop => stationName(stop.name) + ' ' + stop.line);
   return links?.length ? links.join(' / ') + ' · ' + name : name;
+}
+
+export function indoorSpaceName(station: Station) {
+  const start = station.stationLinks?.find(link => link.routeEndpoint === 'start');
+  const end = station.stationLinks?.find(link => link.routeEndpoint === 'end');
+  if (start && end && stationName(start.name) === stationName(end.name))
+    return `${stationName(start.name)} · ${start.line} → ${end.line}`;
+  return spaceLabel(station);
 }
 export const stationUrl = import.meta.env.BASE_URL + 'api/station';
 
@@ -56,5 +67,6 @@ export async function loadLayouts(signal?: AbortSignal): Promise<SpaceLayout[]> 
 
 export async function loadTrackingSpaces(signal: AbortSignal): Promise<SpaceLayout[]> {
   const id = new URLSearchParams(location.search).get('space');
-  return id ? [{ id, station: (await loadStation(signal, id)).station }] : loadLayouts(signal);
+  const spaces = id ? [{ id, station: (await loadStation(signal, id)).station }] : await loadLayouts(signal);
+  return spaces.map(({ id, station }) => ({ id, station: station.tagGraph ? { ...station, route: defaultWalk(station) } : station }));
 }

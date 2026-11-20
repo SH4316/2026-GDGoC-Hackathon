@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { GeoPoint, Journey, Place } from './routes';
+import type { RouteTransfer } from './stationProgress';
 
 const latLng = ([lon, lat]: GeoPoint): L.LatLngTuple => [lat, lon];
 // The initial map covers the project's Choji transfer station. GPS is requested on demand.
@@ -10,8 +11,8 @@ const fit = (map: L.Map, points: GeoPoint[]) => {
   if (points.length) map.fitBounds(L.latLngBounds(points.map(latLng)), { padding: [36, 35], maxZoom: 17, animate: false });
 };
 
-export function RouteMap({ origin, destination, trip, step, position, onPick }: {
-  origin?: Place; destination?: Place; trip?: Journey; step?: number; position?: GeoPoint;
+export function RouteMap({ origin, destination, trip, transfers, step, position, onPick }: {
+  origin?: Place; destination?: Place; trip?: Journey; transfers: RouteTransfer[]; step?: number; position?: GeoPoint;
   onPick?: (point: GeoPoint) => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
@@ -73,6 +74,40 @@ export function RouteMap({ origin, destination, trip, step, position, onPick }: 
     }
     return () => { group.remove(); };
   }, [origin, destination, trip]);
+
+  useEffect(() => {
+    if (!transfers.length) return;
+    const map = atlas.current!;
+    const group = L.layerGroup().addTo(map);
+    const markers: L.CircleMarker[] = [];
+    for (const transfer of transfers) {
+      if (!transfer.point) continue;
+      const label = document.createElement('div');
+      const title = document.createElement('strong');
+      title.textContent = transfer.station + ' 환승';
+      const lines = document.createElement('span');
+      lines.textContent = transfer.fromLine + ' → ' + transfer.toLine;
+      label.append(title, lines);
+      const marker = L.circleMarker(latLng(transfer.point), { pane: 'markerPane', radius: 7, weight: 3,
+        color: '#fff', fillColor: '#1c574a', fillOpacity: 1, interactive: false })
+        .bindTooltip(label, { permanent: true, direction: 'right', offset: [6, 0], className: 'transfer-label', opacity: 1 }).addTo(group);
+      markers.push(marker);
+    }
+    function positionLabels() {
+      for (const marker of markers) {
+        const tooltip = marker.getTooltip()!;
+        const width = tooltip.getElement()?.offsetWidth;
+        if (!width) continue;
+        // Keep the label clear of the controls at the lower left when space permits.
+        const x = map.latLngToContainerPoint(marker.getLatLng()).x;
+        tooltip.options.direction = x + 12 + width <= map.getSize().x ? 'right' : 'left';
+        tooltip.update();
+      }
+    }
+    positionLabels();
+    map.on('moveend resize', positionLabels);
+    return () => { map.off('moveend resize', positionLabels); group.remove(); };
+  }, [transfers]);
 
   useEffect(() => {
     if (!trip) return;

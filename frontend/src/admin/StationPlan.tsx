@@ -4,8 +4,8 @@ import { TagMarkers } from './TagMarkers';
 
 export type PlottedTag = { index: number; id: string; center: Point; yaw: number; surface?: TagSurface };
 
-export function StationPlan({ outline, route, tags, selected, select }: {
-  outline: Point[]; route: Point[]; tags: PlottedTag[]; selected: number | null; select: (index: number) => void;
+export function StationPlan({ passages, outline, route, tags, selected, select }: {
+  passages: Point[][]; outline: Point[]; route: Point[]; tags: PlottedTag[]; selected: number | null; select: (index: number) => void;
 }) {
   const frame = useRef<HTMLDivElement>(null);
   const surface = useRef<HTMLCanvasElement>(null);
@@ -16,7 +16,7 @@ export function StationPlan({ outline, route, tags, selected, select }: {
     return () => observer.disconnect();
   }, []);
 
-  const points: Point[] = [[0, 0], ...outline, ...route, ...tags.map(tag => tag.center)];
+  const points: Point[] = [[0, 0], ...outline, ...route, ...passages.flat(), ...tags.map(tag => tag.center)];
   const minX = Math.min(...points.map(p => p[0])), maxX = Math.max(...points.map(p => p[0]));
   const minY = Math.min(...points.map(p => p[1])), maxY = Math.max(...points.map(p => p[1]));
   const scale = Math.min(Math.max(1, width - 120) / 2 / Math.max(.5, maxX / 2 - minX / 2),
@@ -79,6 +79,9 @@ export function StationPlan({ outline, route, tags, selected, select }: {
       }
       ctx.restore();
     }
+    ctx.strokeStyle = '#79adc2';
+    ctx.lineWidth = 2;
+    for (const edge of passages) { drawPath(edge); ctx.stroke(); }
     if (!route.length) return;
     drawPath(route);
     ctx.lineWidth = 3;
@@ -98,7 +101,7 @@ export function StationPlan({ outline, route, tags, selected, select }: {
       ctx.lineWidth = 2;
       ctx.stroke();
     });
-  }, [width, height, scale, originX, originY, outline, route]);
+  }, [width, height, scale, originX, originY, outline, route, passages]);
 
   return <div className="plan-stage" ref={frame}>
     <canvas ref={surface} role="img" aria-label="지형 경계와 안내 경로가 표시된 평면 배치도" />

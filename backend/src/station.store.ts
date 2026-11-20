@@ -107,7 +107,7 @@ export class StationStore {
   }
 
   private checkSpace(station: Station, spaceId?: string) {
-    if (!station.route.length && station.stationLinks?.some(stop => stop.routeEndpoint))
+    if (!station.tagGraph && !station.route.length && station.stationLinks?.some(stop => stop.routeEndpoint))
       throw new BadRequestException('연결 역에 출발점이나 도착점을 지정하려면 안내 경로를 입력하세요.');
     const tagIds = new Set(station.tags.map(tag => tag.id));
     for (const { id, station: other } of this.listLayouts()) {
@@ -157,7 +157,13 @@ export class StationStore {
     const current = this.read(id);
     if (expected && expected !== '*' && current.etag !== expected)
       throw new PreconditionFailedException('다른 기기에서 배치를 수정했습니다. 최신 배치를 불러와 다시 저장하세요.');
-    const station = this.validate(input);
+    let station = this.validate(input);
+    if (current.station.tagGraph && input && typeof input === 'object' && !('tagGraph' in input)) {
+      // An older editor does not send the graph or its floor offsets.
+      const previous = new Map(current.station.tags.map(tag => [tag.id, tag.walkPoint]));
+      const tags = station.tags.map(tag => ({ ...tag, walkPoint: tag.walkPoint ?? previous.get(tag.id) }));
+      station = this.validate({ ...station, tags, tagGraph: current.station.tagGraph });
+    }
     const next = { ...station, terrain: station.terrain ?? current.station.terrain,
       stationLinks: station.stationLinks ?? current.station.stationLinks };
     this.checkSpace(next, id);

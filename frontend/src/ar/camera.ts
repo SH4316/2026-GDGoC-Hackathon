@@ -1,6 +1,8 @@
 import opencvUrl from '@techstark/opencv-js/dist/opencv.js?url';
 
 import { IndoorTracking, type CameraPose, type MinimapPose } from './indoorTracking';
+import { indoorCue, type IndoorCue, type Maneuver } from './indoorGuidance';
+import { routeTree, tagNetwork } from './tagRouting';
 import { readMotion, screenAngle } from './motion';
 import { watchCameraFrames } from './videoFrames';
 import type { Fix, Intrinsics } from './recording';
@@ -13,10 +15,14 @@ export type TagReference = { spaceId: string; id: number };
 type Hooks = {
   ready: () => void;
   located: (space: SpaceLayout) => void;
+  arrived: (space: SpaceLayout) => void;
+  cue: (cue: IndoorCue | undefined) => void;
   destinationNearby: (spaceId: string | undefined) => void;
   minimap: (pose: MinimapPose | undefined) => void;
   tagSeen: (tag: TagReference) => void;
   chooseSpace: (ids: string[]) => void;
+  destination: () => TagReference | undefined;
+  route: (spaceId: string, points: Point[]) => void;
   selection: () => SpaceSelection | undefined;
   recordingSpace: () => string | undefined;
   debug: () => DebugSession | null;
@@ -27,9 +33,10 @@ type Hooks = {
   pause: () => void;
 };
 type Detection = { id: number; image: Point[]; registered: boolean };
-type Frame = { type: 'frame'; spaceId?: string; referenceTag?: TagReference; candidates?: string[]; fix: Fix | null;
+type Frame = { type: 'frame'; routeRevision?: number; route?: Point[]; spaceId?: string; referenceTag?: TagReference; candidates?: string[]; fix: (Fix & { destinationDistance: number; maneuver?: Maneuver; guide?: Point[][] }) | null;
   recording?: { spaceId: string; intrinsics: Intrinsics; fix: Fix | null };
-  floorMotion?: CameraPose & { spaceId: string; referenceTimeMs: number }; intrinsics?: Intrinsics; detections: Detection[] };
+  floorMotion?: CameraPose & { spaceId: string; referenceTimeMs: number; guide?: Point[][] }; pendingFloorSpace?: string;
+  intrinsics?: Intrinsics; detections: Detection[] };
 type Reply = { type: 'ready' } | { type: 'error'; message: string } | Frame;
 
 type StationPose = {
@@ -79,16 +86,36 @@ function markTag(ctx: CanvasRenderingContext2D, tag: Detection, [left, top, righ
   ctx.restore();
 }
 
-export function openPassage(video: HTMLVideoElement, overlay: HTMLCanvasElement, modelCanvas: HTMLCanvasElement,
+function drawGuide(ctx: CanvasRenderingContext2D, polygons: Point[][]) {
+  ctx.beginPath();
+  for (const [first, ...rest] of polygons) {
+    ctx.moveTo(...first);
+    for (const point of rest) ctx.lineTo(...point);
+    ctx.closePath();
+  }
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = Math.max(3, ctx.canvas.width / 180);
+  ctx.strokeStyle = '#154d43';
+  ctx.stroke();
+  ctx.fillStyle = '#62e9cb';
+  ctx.fill();
+}
+
+export function openPassage(video: HTMLVideoElement, guideCanvas: HTMLCanvasElement, overlay: HTMLCanvasElement, modelCanvas: HTMLCanvasElement,
                             spaces: SpaceLayout[], hooks: Hooks) {
   const lifetime = new AbortController();
   const capture = document.createElement('canvas');
   const pixels = capture.getContext('2d', { willReadFrequently: true })!;
   const drawing = overlay.getContext('2d')!;
+  const guideDrawing = guideCanvas.getContext('2d')!;
   const base = import.meta.env.BASE_URL;
   let worker: Worker | undefined;
   let models: TagModels | undefined;
   const layouts = new Map(spaces.map(space => [space.id, space]));
+  const networks = new Map(spaces.map(space => [space.id, tagNetwork(space.station)]));
+  let frameDestination: TagReference | undefined;
+  let routeRevision: number | undefined;
+  let activeRoute: Point[] = [];
   let modelSpace: SpaceLayout | undefined;
   let modelRevision = 0;
   let stream: MediaStream | undefined;
@@ -107,6 +134,15 @@ export function openPassage(video: HTMLVideoElement, overlay: HTMLCanvasElement,
   let tracking = new IndoorTracking();
   let motionTimer: number | undefined;
   let shownPose: MinimapPose | undefined;
+  let shownCue: IndoorCue | undefined;
+  let arrivedSpace: string | undefined;
+  let lastGuide: { spaceId: string; at: number } | undefined;
+
+  function publishCue(cue?: IndoorCue) {
+    if (cue?.key === shownCue?.key) return;
+    shownCue = cue;
+    hooks.cue(cue);
+  }
 
   function publishMinimap() {
     const selectedId = hooks.selection()?.preferredSpace;
@@ -124,12 +160,23 @@ export function openPassage(video: HTMLVideoElement, overlay: HTMLCanvasElement,
     hooks.debug()?.motion(sample, fixed ? undefined : estimate);
   }
 
-  function clear() {
+  function clearTags() {
     drawing.clearRect(0, 0, overlay.width, overlay.height);
+    publishCue();
     models?.clear();
     if (fixed) window.dispatchEvent(new CustomEvent('station-pose', { detail: null }));
     fixed = false;
     publishMinimap();
+  }
+
+  function clearGuide() {
+    guideDrawing.clearRect(0, 0, guideCanvas.width, guideCanvas.height);
+    lastGuide = undefined;
+  }
+
+  function clear() {
+    clearTags();
+    clearGuide();
   }
 
   function stop() {
@@ -153,6 +200,10 @@ export function openPassage(video: HTMLVideoElement, overlay: HTMLCanvasElement,
     models?.dispose();
     models = undefined;
     modelSpace = undefined;
+    arrivedSpace = undefined;
+    frameDestination = undefined;
+    routeRevision = undefined;
+    activeRoute = [];
     modelRevision++;
   }
 
@@ -161,14 +212,36 @@ export function openPassage(video: HTMLVideoElement, overlay: HTMLCanvasElement,
     hooks.state('태그 탐색 중');
   }
 
-  function paint({ spaceId, referenceTag, candidates, fix, floorMotion, detections, intrinsics }: Frame) {
+  function paint({ spaceId, route, routeRevision: revision, referenceTag, candidates, fix, floorMotion, pendingFloorSpace, detections, intrinsics }: Frame) {
     clearTimeout(clearTimer);
     const age = performance.now() - frameAt;
     if (age >= STALE_MS) { expire(); return; }
-    if (floorMotion && tracking.correct(floorMotion.spaceId, floorMotion, frameAt, frameAngle, 'floor')) {
+    if (spaceId && fix && route) {
+      activeRoute = route;
+      routeRevision = revision;
+      hooks.route(spaceId, route);
+    }
+    const floorAccepted = floorMotion && tracking.correct(floorMotion.spaceId, floorMotion, frameAt, frameAngle, 'floor');
+    if (floorAccepted) {
       hooks.debug()?.visual(frameAt, 'floor', floorMotion.spaceId, floorMotion.position);
     }
-    if (!fix && !detections.length) { expire(); return; }
+    const guideSpace = fix ? spaceId : floorAccepted ? floorMotion.spaceId : undefined;
+    const guide = fix?.guide ?? (floorAccepted ? floorMotion.guide : undefined);
+    // Optical flow runs at up to 10 Hz. Hold only between scheduled matches in the same space.
+    if (!lastGuide || !pendingFloorSpace || pendingFloorSpace !== lastGuide.spaceId || frameAt - lastGuide.at > 130) {
+      clearGuide();
+      if (guideSpace && guide?.length && !fix?.arrived && guideSpace !== arrivedSpace) {
+        drawGuide(guideDrawing, guide);
+        lastGuide = { spaceId: guideSpace, at: frameAt };
+      }
+    }
+    if (!fix && !detections.length) {
+      if (!lastGuide) { expire(); return; }
+      clearTags();
+      hooks.state('위치 추정 중', '다음 태그를 비추면 위치가 보정됩니다.');
+      clearTimer = window.setTimeout(expire, Math.max(0, STALE_MS - (performance.now() - lastGuide.at)));
+      return;
+    }
     if (referenceTag) {
       if (tracking.spaceId && referenceTag.spaceId !== tracking.spaceId) tracking = new IndoorTracking();
       hooks.tagSeen(referenceTag);
@@ -191,6 +264,7 @@ export function openPassage(video: HTMLVideoElement, overlay: HTMLCanvasElement,
     const space = spaceId ? layouts.get(spaceId) : undefined;
     const spaceChanged = space !== modelSpace;
     if (fix && space && spaceChanged) {
+      arrivedSpace = undefined;
       models?.clear();
       models?.dispose();
       models = undefined;
@@ -221,23 +295,28 @@ export function openPassage(video: HTMLVideoElement, overlay: HTMLCanvasElement,
     }
     if ((!fixed || spaceChanged) && fix?.ids.length && space) hooks.located(space);
     fixed = !!fix;
-    if (fix && space && tracking.correct(space.id, fix, frameAt, frameAngle, 'tag', space.station.route)) {
+    if (fix && space && tracking.correct(space.id, fix, frameAt, frameAngle, 'tag', activeRoute)) {
       hooks.debug()?.visual(frameAt, 'tag', space.id, fix.position);
     }
     publishMinimap();
+    if (!fix || !space) publishCue();
     if (fix && space) {
-      const end = space.station.route.at(-1);
-      const nearby = !!end && Math.hypot(fix.position[0] - end[0], fix.position[1] - end[1]) <= MAP_RETURN_RADIUS_M;
+      const nearby = fix.destinationDistance <= MAP_RETURN_RADIUS_M;
       hooks.destinationNearby(nearby ? space.id : undefined);
-      let hint = '다음 태그와 진행 방향의 바닥을 함께 비추세요.';
-      if (!end) hint = '이 공간에 등록된 실내 경로가 없습니다.';
-      else if (fix.arrived) {
-        const stop = space.station.stationLinks?.find(stop => stop.routeEndpoint === 'end');
-        hint = stop ? stop.line + ' 환승 위치에 도착했습니다.' : '실내 통로 경로가 끝났습니다.';
+      if (fix.arrived && arrivedSpace !== space.id) {
+        arrivedSpace = space.id;
+        hooks.arrived(space);
       }
-      else if (nearby) hint = '실내 경로의 도착 지점이 가깝습니다.';
-      else if (poly) hint = '바닥 화살표를 따라 이동하세요.';
-      hooks.state('위치 인식', hint);
+      const targetTag = frameDestination?.spaceId === space.id ? frameDestination.id : undefined;
+      let cue = indoorCue(space, fix.maneuver, !!fix.arrived, targetTag);
+      if (!activeRoute.length) {
+        const mapped = space.station.tagGraph || space.station.route.length;
+        const text = mapped ? '현재 태그에서 목적지까지 연결된 통로가 없습니다.' : '이 공간에 등록된 실내 경로가 없습니다.';
+        cue = { key: space.id + '/unreachable', text };
+      }
+      if (cue && !fix.arrived) cue.key += '/' + routeRevision;
+      publishCue(cue);
+      hooks.state('위치 인식', cue?.text ?? '다음 태그와 진행 방향의 바닥을 함께 비추세요.');
     } else if (referenceTag) {
       hooks.state('태그 감지', '내 위치를 확인하려면 태그 전체가 화면에 크게 보이도록 비추세요.');
     } else if (candidates?.length) {
@@ -258,24 +337,42 @@ export function openPassage(video: HTMLVideoElement, overlay: HTMLCanvasElement,
     if (!w || !h) return false;
     if (capture.width !== w || capture.height !== h) {
       clear();
-      capture.width = overlay.width = w;
-      capture.height = overlay.height = h;
+      capture.width = overlay.width = guideCanvas.width = w;
+      capture.height = overlay.height = guideCanvas.height = h;
     }
     pixels.drawImage(video, 0, 0, w, h);
     const rgba = pixels.getImageData(0, 0, w, h).data.buffer;
-    // Both layers use object-fit: cover. Pick an arrow visible in that crop.
+    // Guided mode fits the whole sensor frame; the map preview and recording camera fill their viewport.
     const scale = Math.max(overlay.clientWidth / w, overlay.clientHeight / h);
-    if (!scale) return false;
-    const marginX = Math.max(0, (w - overlay.clientWidth / scale) / 2);
-    const marginY = Math.max(0, (h - overlay.clientHeight / scale) / 2);
+    if (!overlay.clientWidth || !overlay.clientHeight) return false;
+    const cropped = getComputedStyle(overlay).objectFit === 'cover';
+    const marginX = cropped ? Math.max(0, (w - overlay.clientWidth / scale) / 2) : 0;
+    const marginY = cropped ? Math.max(0, (h - overlay.clientHeight / scale) / 2) : 0;
     frameBounds = [marginX, marginY, w - marginX, h - marginY];
     frameAt = now;
     frameAngle = screenAngle() ?? 0;
     frameMediaTime = mediaTime;
     busy = true;
     frameSelection = hooks.selection();
+    const destination = hooks.destination();
+    if (destination !== frameDestination) {
+      // Restore the old space's default if the user picked a target in another space.
+      const changed = new Set([frameDestination?.spaceId, destination?.spaceId]);
+      for (const spaceId of changed) {
+        if (!spaceId) continue;
+        const network = networks.get(spaceId);
+        if (!network) continue;
+        const goal = destination?.spaceId === spaceId ? network.anchors[destination.id] : network.end;
+        worker.postMessage({ type: 'destination', spaceId, tree: routeTree(network, goal) });
+      }
+      frameDestination = destination;
+      arrivedSpace = undefined;
+      routeRevision = undefined;
+      activeRoute = [];
+      clear();
+    }
     worker.postMessage({ type: 'frame', w, h, rgba, bounds: frameBounds, frameTimeMs: now,
-      floorAnchor: tracking.floorAnchor(now), recordingSpaceId: hooks.recordingSpace(), ...frameSelection }, [rgba]);
+      knownRoute: routeRevision, floorAnchor: tracking.floorAnchor(now), recordingSpaceId: hooks.recordingSpace(), ...frameSelection }, [rgba]);
     return true;
   }
 
@@ -300,7 +397,7 @@ export function openPassage(video: HTMLVideoElement, overlay: HTMLCanvasElement,
       video.srcObject = camera;
       await video.play();
       if (token !== generation) return;
-      worker = new Worker(base + 'ar/tracker.js?v=4');
+      worker = new Worker(base + 'ar/tracker.js?v=7');
       worker.onmessage = ({ data }: MessageEvent<Reply>) => {
         if (token !== generation) return;
         if (data.type === 'ready') {
@@ -312,7 +409,7 @@ export function openPassage(video: HTMLVideoElement, overlay: HTMLCanvasElement,
         }
         else if (data.type === 'frame') {
           busy = false;
-          if (frameSelection !== hooks.selection()) { expire(); return; }
+          if (frameSelection !== hooks.selection() || frameDestination !== hooks.destination()) { expire(); return; }
           const recording = data.recording;
           if (recording && recording.spaceId === hooks.recordingSpace())
             hooks.frame(capture, frameAt, frameMediaTime, recording.intrinsics, recording.fix);
@@ -323,7 +420,8 @@ export function openPassage(video: HTMLVideoElement, overlay: HTMLCanvasElement,
       worker.onerror = (error) => {
         if (token === generation) { console.error('역사 AR:', error.message); stop(); hooks.error('태그 인식기를 다시 연결해 주세요.'); }
       };
-      worker.postMessage({ type: 'init', library: new URL(opencvUrl, location.href).href, spaces });
+      worker.postMessage({ type: 'init', library: new URL(opencvUrl, location.href).href,
+        spaces: spaces.map(space => ({ ...space, tree: routeTree(networks.get(space.id)!) })) });
     } catch (error) {
       if (token === generation) {
         console.warn('역사 AR:', error); stop();

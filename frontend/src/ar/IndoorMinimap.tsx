@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { MinimapPose } from './indoorTracking';
 import { motionAccess, requestMotionAccess, type MotionAccess } from './motion';
-import { spaceLabel, type SpaceLayout } from './station';
+import { indoorSpaceName, spaceLabel, type Point, type SpaceLayout } from './station';
 
 const padding = 22;
 
-function floorPlan({ station }: SpaceLayout) {
+function floorPlan({ station }: SpaceLayout, path = station.route, customTarget?: number) {
   const outline = station.terrain?.outline ?? [];
-  const points = [...outline, ...station.route, ...station.tags.map(tag => tag.center)];
+  const points = [...outline, ...station.route, ...path, ...station.tags.map(tag => tag.center)];
   if (!points.length) return;
   const xs = points.map(([x]) => x), ys = points.map(([, y]) => y);
-  const endpoints = (station.stationLinks ?? []).flatMap(stop => {
+  const endpoints = (customTarget === undefined ? station.stationLinks ?? [] : []).flatMap(stop => {
     if (!stop.routeEndpoint || station.route.length < 2) return [];
     const start = stop.routeEndpoint === 'start';
     return [{ point: start ? station.route[0] : station.route.at(-1)!, start,
@@ -18,17 +18,17 @@ function floorPlan({ station }: SpaceLayout) {
   });
   return {
     minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys),
-    outline: outline.join(' '), route: station.route.join(' '), end: station.route.at(-1), endpoints,
+    outline: outline.join(' '), route: path.join(' '), end: path.at(-1), endpoints,
   };
 }
 
-export function IndoorMinimap({ layout, preview, referenceTagId, pose, cameraReady }: {
-  layout?: SpaceLayout; preview: boolean; referenceTagId?: number; pose?: MinimapPose; cameraReady: boolean;
+export function IndoorMinimap({ layout, route, customTarget, preview, referenceTagId, pose, cameraReady, guided = false }: {
+  layout?: SpaceLayout; route?: Point[]; customTarget?: number; preview: boolean; referenceTagId?: number; pose?: MinimapPose; cameraReady: boolean; guided?: boolean;
 }) {
   const surface = useRef<HTMLDivElement>(null);
   const [{ width, height }, setSize] = useState({ width: 0, height: 0 });
   const [requestedAccess, setAccess] = useState<MotionAccess>();
-  const plan = useMemo(() => layout && floorPlan(layout), [layout]);
+  const plan = useMemo(() => layout && floorPlan(layout, route, customTarget), [layout, route, customTarget]);
   useEffect(() => {
     if (!surface.current) return;
     const observer = new ResizeObserver(([{ contentRect }]) => setSize({ width: contentRect.width, height: contentRect.height }));
@@ -38,7 +38,7 @@ export function IndoorMinimap({ layout, preview, referenceTagId, pose, cameraRea
 
   if (!layout) return null;
   const access = requestedAccess ?? motionAccess();
-  const name = spaceLabel(layout.station);
+  const name = customTarget !== undefined ? (layout.station.terrain?.name ?? '실내') + ' · 태그 ' + customTarget : guided ? indoorSpaceName(layout.station) : spaceLabel(layout.station);
   const here = !preview && pose?.spaceId === layout.id ? pose : undefined;
   const tag = !here && referenceTagId !== undefined ? layout.station.tags.find(item => item.id === referenceTagId) : undefined;
   const point = here?.point ?? tag?.center;
@@ -80,17 +80,18 @@ export function IndoorMinimap({ layout, preview, referenceTagId, pose, cameraRea
         {live && here.headingDeg !== null && <path d="M0 -20 L7 -5 H-7 Z" transform={`rotate(${here.headingDeg})`} fill="#fff" />}
         <circle r="11" fill={tag ? '#c77813' : live ? '#087acc' : '#506779'} stroke="#fff"
           strokeWidth="2.5" strokeDasharray={here && here.source !== 'tag' ? '4 2' : undefined} />
-        <text x={labelOnRight ? 22 : -22} textAnchor={labelOnRight ? 'start' : 'end'} dy=".35em"
+        {!guided && <text x={labelOnRight ? 22 : -22} textAnchor={labelOnRight ? 'start' : 'end'} dy=".35em"
           fontSize="14" fontWeight="700" fill="#fff" stroke="#17251e" strokeWidth="3" strokeLinejoin="round" paintOrder="stroke">
           {label}
-        </text>
+        </text>}
       </g>}
     </svg>;
   }
 
   return <figure className="indoor-minimap" aria-label="실내 미니맵">
     <div className="minimap-plan" ref={surface}>{plan ? drawing : <p>등록된 평면 정보가 없습니다.</p>}</div>
-    <figcaption><span title={name}>{name}</span>{preview && <small>미리보기</small>}
+    <figcaption><span title={name}>{name}</span>{guided && point && <span className="map-position-key" data-live={!!live} data-tag={!!tag}>{label}</span>}
+      {preview && <small>미리보기</small>}
       {cameraReady && access === 'prompt' &&
         <button type="button" onClick={async () => setAccess(await requestMotionAccess())}>동작 센서 켜기</button>}
       {cameraReady && access === 'denied' && <small role="status">동작 센서 권한 꺼짐</small>}

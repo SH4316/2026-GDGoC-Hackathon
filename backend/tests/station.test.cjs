@@ -158,4 +158,27 @@ test('station edits and models survive a restart; concurrent edits and invalid r
   await app.close();
   await start();
   assert.deepEqual(await (await fetch(base + '/spaces/' + passage.id)).json(), transfer);
+
+  const graphSpace = { ...transfer, terrain: { name: '분기 통로' }, route: [],
+    tags: [[510, 0, 0], [511, 0, 2], [512, 2, 2], [513, -3, 0]].map(([id, x, y]) =>
+      ({ id, center: [x, y + .4], walkPoint: [x, y], yawDeg: 0 })),
+    tagGraph: { startTag: 510, endTag: 512, edges: [[510, 511], [511, 512], [510, 513], [513, 512]] } };
+  const graphResponse = await createSpace(graphSpace);
+  assert.equal(graphResponse.status, 201);
+  const graphUrl = base + '/spaces/' + (await graphResponse.json()).id;
+  const updateGraph = body => fetch(graphUrl, { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...graphSpace, ...body }) });
+  for (const edges of [[[510, 510]], [[510, 999]], [[510, 514]], [[510, 511], [511, 510]], [[510, 511]]]) {
+    assert.equal((await updateGraph({ tagGraph: { ...graphSpace.tagGraph, edges } })).status, 400);
+  }
+  assert.equal((await updateGraph({ tagGraph: { ...graphSpace.tagGraph, endTag: 514 } })).status, 400);
+  const oldClient = await updateGraph({ tagGraph: undefined, tags: graphSpace.tags.map(({ walkPoint, ...tag }) => tag) });
+  const preserved = await oldClient.json();
+  assert.deepEqual(preserved.tagGraph, graphSpace.tagGraph);
+  assert.deepEqual(preserved.tags, graphSpace.tags);
+  assert.equal((await updateGraph({ tagGraph: undefined, tags: [] })).status, 400);
+  const graphId = graphUrl.split('/').at(-1);
+  await app.close();
+  await start();
+  assert.deepEqual(await (await fetch(base + '/spaces/' + graphId)).json(), graphSpace);
 });

@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const { createHash } = require('node:crypto');
 const { mkdtemp, readFile, readdir, rm, utimes, writeFile } = require('node:fs/promises');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
@@ -294,4 +295,41 @@ test('permanently reuses response files by provider, search text, mode and coord
     assert.deepEqual(await (await request('walk')).json(), { status: 'NO_RESULTS', provider: 'tmap' });
     assert.equal(upstream.mock.callCount(), 2);
   });
+});
+
+test('an exact legacy TMAP transit route bridges transient failures until a current response is available', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'legacy-transit-test-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const request = await startApi(t, '', 'tmap-key', directory);
+  const input = [...new URLSearchParams(coordinates).values()];
+  const hash = createHash('sha256').update(JSON.stringify([1, 'tmap', 'transit', input])).digest('hex');
+  const file = 'tmap-transit-' + hash + '.json';
+  const step = { properties: { type: 'SUBWAY', guidance: '정왕에서 수도권4호선 탑승 → 초지에서 하차' },
+    path: { points: [[126.742931, 37.3518], [126.805994, 37.320667]] } };
+  const saved = { status: 'OK', routes: [{ steps: [step] }] };
+  await writeFile(join(directory, file), JSON.stringify(saved));
+  const mock = t.mock.method(globalThis, 'fetch', async () => { throw new TypeError('Offline'); });
+  for (const failure of [
+    async () => { throw new TypeError('Offline'); },
+    async () => new Response(null, { status: 503 }),
+    async () => new Response(null, { status: 429 }),
+  ]) {
+    mock.mock.mockImplementation(failure);
+    assert.deepEqual(await (await request('transit')).json(), { ...saved, provider: 'tmap' });
+  }
+  assert.deepEqual(await readdir(directory), [file]);
+  assert.equal((await request('transit', coordinates.replace('127.12628814', '127.12628815'))).status, 429);
+  mock.mock.mockImplementation(async () => Response.json({ metaData: {} }));
+  assert.equal((await request('transit')).status, 502);
+  mock.mock.mockImplementation(async () => new Response('Invalid JSON'));
+  assert.equal((await request('transit')).status, 502);
+  mock.mock.mockImplementation(async () => new Response(null, { status: 403 }));
+  assert.equal((await request('transit')).status, 503);
+  mock.mock.mockImplementation(async () => new Response(null, { status: 204 }));
+  const noRoute = { status: 'NO_RESULTS', provider: 'tmap' };
+  assert.deepEqual(await (await request('transit')).json(), noRoute);
+  const calls = mock.mock.callCount();
+  mock.mock.mockImplementation(async () => new Response(null, { status: 429 }));
+  assert.deepEqual(await (await request('transit')).json(), noRoute);
+  assert.equal(mock.mock.callCount(), calls);
 });

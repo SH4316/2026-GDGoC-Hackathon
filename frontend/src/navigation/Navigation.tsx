@@ -3,15 +3,45 @@ import { RouteChat } from './RouteChat';
 import { RouteMap } from './RouteMap';
 import { PassagePreview } from '../ar/PassagePreview';
 import {
-  currentOrigin, directionsApi, findRoute, formatMeters, watchLocation,
-  type GeoPoint, type Journey, type JourneyProgress, type Place, type RouteMode,
+  currentOrigin, directionsApi, displayPlaceName, findRoute, formatMeters, watchLocation,
+  type GeoPoint, type Journey, type JourneyProgress, type Place, type RouteMode, type RouteStep,
 } from './routes';
 import { stationName } from '../ar/station';
+import { prepareIndoorVoice } from '../ar/IndoorVoice';
+import type { RouteTransfer } from './stationProgress';
 import './navigation.css';
 
 type Endpoint = 'origin' | 'destination';
 const labels = { origin: '출발지', destination: '도착지' };
-type Scanner = { enabled: boolean; error: string; status: string; spacePicker: ReactNode; toggle: () => void; retry: () => void };
+type Scanner = { enabled: boolean; ready: boolean; error: string; status: string; spacePicker: ReactNode; toggle: () => void; retry: () => void };
+
+function transferHint(transfer: RouteTransfer, step: number) {
+  return (step < transfer.transferStep ? transfer.station + '에 도착하면 ' : '') + '환승 통로의 태그를 비추세요.';
+}
+
+function boardingInstruction(leg: RouteStep, line: string) {
+  const stop = leg.rail?.stops.at(-1)?.name.trim();
+  if (!stop) return leg.instruction;
+  const last = line.charCodeAt(line.length - 1);
+  const particle = last >= 0xac00 && last <= 0xd7a3 ? ((last - 0xac00) % 28 ? '을' : '를') : ' 열차를';
+  return line + particle + ' 타고 ' + stationName(stop) + '에서 내리세요.';
+}
+
+function ScanControls({ scanner, transfer, step }: { scanner: Scanner; transfer?: RouteTransfer; step: number }) {
+  const readyHint = transfer ? transferHint(transfer, step) : '역 안의 태그를 비추세요.';
+  return <section className="scan-controls" data-transfer={!!transfer} aria-label={transfer ? transfer.station + ' 환승 안내' : '역 안 안내'}>
+    <h2>{transfer ? transfer.station + ' 환승' : '역 안 안내'}</h2>
+    {transfer && <strong>{transfer.fromLine} → {transfer.toLine}</strong>}
+    <p role="status" className={scanner.error ? 'nav-error' : undefined}>
+      {scanner.error || (!scanner.enabled ? '태그 인식이 꺼져 있습니다.' : scanner.status || (scanner.ready ? readyHint : '카메라 연결 중'))}
+    </p>
+    {scanner.enabled && scanner.spacePicker}
+    <div className="scan-actions">
+      {scanner.enabled && scanner.error && <button type="button" onClick={scanner.retry}>카메라 다시 연결</button>}
+      <button type="button" onClick={scanner.toggle}>{scanner.enabled ? '태그 인식 끄기' : '태그 인식 켜기'}</button>
+    </div>
+  </section>;
+}
 
 function RoutePanelToggle({ expanded, onChange, ref }: {
   expanded: boolean; onChange: (expanded: boolean) => void; ref: Ref<HTMLButtonElement>;
@@ -91,10 +121,10 @@ function PlaceSearch({ endpoint, select }: { endpoint: Endpoint; select: (place:
   </div>;
 }
 
-export function Navigation({ trip, progress, updateGps, indoor, scanner, start, startIndoor, finish, openField, adminUrl }: {
-  trip?: Journey; progress: JourneyProgress; updateGps: (point: GeoPoint, accuracy: number, timestamp: number) => void;
+export function Navigation({ trip, transfers, progress, updateGps, indoor, scanner, start, startIndoor, finish, adminUrl }: {
+  trip?: Journey; transfers: RouteTransfer[]; progress: JourneyProgress; updateGps: (point: GeoPoint, accuracy: number, timestamp: number) => void;
   indoor: boolean; scanner: Scanner; start: (journey: Journey, position?: GeoPoint) => void;
-  startIndoor: () => void; finish: () => void; openField: () => void; adminUrl: string;
+  startIndoor: () => void; finish: () => void; adminUrl: string;
 }) {
   const [origin, setOrigin] = useState<Place>();
   const [destination, setDestination] = useState<Place>();
@@ -106,20 +136,25 @@ export function Navigation({ trip, progress, updateGps, indoor, scanner, start, 
   const { step, position } = progress;
   const [panelOpen, setPanelOpen] = useState(true);
   const routeRequest = useRef<AbortController | null>(null);
+  const panel = useRef<HTMLElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const panelToggle = useRef<HTMLButtonElement>(null);
   useEffect(() => () => routeRequest.current?.abort(), []);
 
   useEffect(() => {
     if (!trip || indoor) return;
-    const focusTarget = heading.current?.offsetHeight ? heading.current : panelToggle.current;
-    focusTarget?.focus({ preventScroll: true });
+    setPanelOpen(true);
+    const focusFrame = requestAnimationFrame(() => {
+      if (panel.current) panel.current.scrollTop = 0;
+      const focusTarget = heading.current?.offsetHeight ? heading.current : panelToggle.current;
+      focusTarget?.focus({ preventScroll: true });
+    });
     let active = true;
     const stop = watchLocation((point, accuracy, timestamp) => {
       if (!active) return;
       updateGps(point, accuracy, timestamp); setGpsError('');
     }, message => { if (active) setGpsError(message); });
-    return () => { active = false; stop?.(); };
+    return () => { active = false; cancelAnimationFrame(focusFrame); stop?.(); };
   }, [trip, indoor, updateGps]);
 
   function select(endpoint: Endpoint, place?: Place) {
@@ -135,6 +170,7 @@ export function Navigation({ trip, progress, updateGps, indoor, scanner, start, 
 
   async function begin() {
     if (!destination || routeRequest.current) return;
+    prepareIndoorVoice('경로를 확인합니다.');
     const controller = new AbortController();
     routeRequest.current = controller;
     setError(''); setBusy(origin ? '경로 탐색 중…' : '현재 위치 확인 중…');
@@ -166,21 +202,29 @@ export function Navigation({ trip, progress, updateGps, indoor, scanner, start, 
   }
   const currentStep = progress.station || (position && !gpsError) ? step : undefined;
   const arrived = !!trip && step === trip.steps.length;
+  const pendingTransfer = transfers.find(transfer => step < transfer.boardingStep);
+  const boardingTransfer = transfers.find(transfer => transfer.boardingStep === currentStep);
   return <div className="navigation" hidden={indoor}>
     <header className="journey-header">
       <span className="journey-brand"><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor"
         strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true"><path d="m2 5 6-2 8 3 6-2v15l-6 2-8-3-6 2zM8 3v15m8-12v15" /></svg>역 길안내</span>
-      {!trip && <nav aria-label="첫 화면 메뉴"><button type="button" onClick={openField}>AR 카메라</button><a href={adminUrl}>관리자 페이지</a></nav>}
+      {!trip && <nav aria-label="첫 화면 메뉴">
+        <a href={adminUrl} aria-label="관리자 페이지">관리자</a>
+        <button type="button" className="start-indoor" onClick={() => {
+          routeRequest.current?.abort(); routeRequest.current = null; setBusy(''); setError(''); startIndoor();
+        }}>역 안 안내 시작</button>
+      </nav>}
       {trip && <button type="button" onClick={finish}>안내 종료</button>}
     </header>
     <div className="journey-body" data-guiding={!!trip} data-collapsed={!!trip && !panelOpen}>
       {trip && <RoutePanelToggle ref={panelToggle} expanded={panelOpen} onChange={setPanelOpen} />}
-      <section key={trip ? 'guidance' : 'setup'} id="journey-information" className="journey-panel" hidden={!!trip && !panelOpen}
+      <section ref={panel} key={trip ? 'guidance' : 'setup'} id="journey-information" className="journey-panel" hidden={!!trip && !panelOpen}
         aria-label={trip ? '현재 경로 안내' : '도착지 설정'}>
         {!trip ? <>
           <div className="setup-heading"><h1>도착지 설정</h1>
             <RouteChat origin={origin} destination={destination} mode={mode} disabled={!!busy}
               accept={journey => {
+                prepareIndoorVoice('길 안내를 시작합니다.');
                 setOrigin(journey.origin); setDestination(journey.destination); setMode(journey.mode);
                 setPicking(null); setError(''); startJourney(journey);
               }}/>
@@ -194,7 +238,7 @@ export function Navigation({ trip, progress, updateGps, indoor, scanner, start, 
                   {(picking !== endpoint || place || endpoint === 'origin') && <button type="button" className="endpoint-value"
                     aria-label={labels[endpoint] + (picking === endpoint ? ' 선택 유지' : ' 변경')} aria-expanded={picking === endpoint}
                     onClick={() => { if (picking === endpoint) select(endpoint, place); else { setPicking(endpoint); setError(''); } }}>
-                    {place?.name ?? (endpoint === 'origin' ? '현재 위치' : '도착지를 선택하세요')}
+                    {place ? displayPlaceName(place.name) : endpoint === 'origin' ? '현재 위치' : '도착지를 선택하세요'}
                     <span className="edit-mark" aria-hidden="true">{picking === endpoint ? '선택 유지' : '변경'}</span>
                   </button>}
                 </div>
@@ -214,9 +258,6 @@ export function Navigation({ trip, progress, updateGps, indoor, scanner, start, 
           <button className="start-route" type="button" disabled={!!busy || !destination || !!picking}
             onClick={() => void begin()}>{busy || '길 안내 시작'}</button>
           <PassagePreview disabled={!!busy} />
-          <button className="start-indoor" type="button" onClick={() => {
-            routeRequest.current?.abort(); routeRequest.current = null; setBusy(''); setError(''); startIndoor();
-          }}>태그로 실내 안내</button>
         </> : <>
           <h1 ref={heading} tabIndex={-1}>2D 길 안내</h1>
           {(trip.seconds !== undefined || trip.meters !== undefined) && <p className="route-summary">
@@ -224,42 +265,47 @@ export function Navigation({ trip, progress, updateGps, indoor, scanner, start, 
             {trip.meters !== undefined && <span>{formatMeters(trip.meters)}</span>}
           </p>}
           {gpsError && <p className="nav-note" role="status">{gpsError}</p>}
-          {progress.station && <p className="nav-note" role="status">태그로 확인한 역 · {stationName(progress.station)}</p>}
+          {boardingTransfer && <section className="transfer-result" aria-label="환승 후 현재 구간">
+            <h2>{boardingTransfer.station} 환승 완료</h2>
+            <p>{boardingInstruction(trip.steps[boardingTransfer.boardingStep], boardingTransfer.toLine)}</p>
+          </section>}
+          {progress.station && !boardingTransfer && <p className="nav-note" role="status">태그로 확인한 역 · {stationName(progress.station)}</p>}
+          {pendingTransfer && <ScanControls scanner={scanner} transfer={pendingTransfer} step={step} />}
           <ol className="route-timeline" aria-label="전체 경로 안내" role="list">
             <li className="timeline-endpoint">
               <span className="timeline-marker">출발</span>
-              <strong>{trip.origin.name}</strong>
+              <strong>{displayPlaceName(trip.origin.name)}</strong>
             </li>
-            {trip.steps.map((leg, index) => <li key={index} aria-current={index === currentStep ? 'step' : undefined}>
-              <span className="timeline-marker" aria-hidden="true">{index + 1}</span>
-              <div className="timeline-leg">
-                <div className="leg-meta">
-                  <b>{leg.kind}</b>
-                  {leg.meters !== undefined && <span>{formatMeters(leg.meters)}</span>}
-                  {index === currentStep && <em>현재 구간</em>}
+            {trip.steps.map((leg, index) => {
+              const transfer = transfers.find(item => item.transferStep === index);
+              const genericWalk = transfer && leg.kind === '도보' && (
+                leg.instruction === '도보 이동' || [transfer.station, transfer.station.slice(0, -1)].some(name =>
+                  leg.instruction === name + '까지 도보 이동'));
+              return <li key={index} aria-current={index === currentStep ? 'step' : undefined}>
+                <span className="timeline-marker" aria-hidden="true">{index + 1}</span>
+                <div className="timeline-leg">
+                  <div className="leg-meta">
+                    <b>{transfer ? transfer.station + ' 환승' : leg.kind}</b>
+                    {leg.meters !== undefined && <span>{formatMeters(leg.meters)}</span>}
+                    {index === currentStep && <em>현재 구간</em>}
+                  </div>
+                  {transfer && <p className="transfer-lines">{transfer.fromLine} → {transfer.toLine}</p>}
+                  {!genericWalk && <p>{leg.instruction}</p>}
+                  {transfer && step < transfer.boardingStep && <small>{transferHint(transfer, step)}</small>}
                 </div>
-                <p>{leg.instruction}</p>
-              </div>
-            </li>)}
+              </li>;
+            })}
             <li className="timeline-endpoint" aria-current={arrived ? 'step' : undefined}>
               <span className="timeline-marker">도착</span>
-              <strong>{trip.destination.name}</strong>
+              <strong>{displayPlaceName(trip.destination.name)}</strong>
             </li>
           </ol>
           {arrived && <p className="arrival-status">도착지에 도착했습니다.</p>}
-          <div className="scan-controls">
-            <strong>역 안 AR 안내</strong>
-            <p role="status">{scanner.error || (scanner.enabled ? scanner.status : '태그 인식이 꺼져 있습니다.')}</p>
-            {scanner.enabled && scanner.spacePicker}
-            <div>
-              {scanner.enabled && scanner.error && <button type="button" onClick={scanner.retry}>다시 연결</button>}
-              <button type="button" onClick={scanner.toggle}>{scanner.enabled ? '인식 끄기' : '태그 인식 켜기'}</button>
-            </div>
-          </div>
+          {!pendingTransfer && <ScanControls scanner={scanner} step={step} />}
           {trip.provider && <small className="route-source">경로 제공 · {trip.provider === 'tmap' ? 'TMAP' : '카카오맵'}</small>}
         </>}
       </section>
-      <RouteMap origin={trip?.origin ?? origin} destination={trip?.destination ?? destination} trip={trip}
+      <RouteMap origin={trip?.origin ?? origin} destination={trip?.destination ?? destination} trip={trip} transfers={transfers}
         step={currentStep} position={trip ? position : undefined} onPick={!trip && picking && !busy ? pickPoint : undefined} />
     </div>
     {trip && <p className="route-announcement" role="status">

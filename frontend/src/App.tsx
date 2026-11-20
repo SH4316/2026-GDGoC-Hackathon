@@ -1,20 +1,24 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SignReader } from './SignReader';
 import { openPassage, type TagReference } from './ar/camera';
 import { IndoorMinimap } from './ar/IndoorMinimap';
 import { LivePassageProgress } from './ar/PassageProgress';
+import { indoorCue, type IndoorCue } from './ar/indoorGuidance';
+import { IndoorVoice, prepareIndoorVoice } from './ar/IndoorVoice';
 import { ArDebugControls, useArDebug } from './ar/ArDebugControls';
 import type { MinimapPose } from './ar/indoorTracking';
 import { FieldRecorder, idleView } from './ar/recording';
-import { currentSpace, loadTrackingSpaces, spaceLabel, stationName, type SpaceLayout } from './ar/station';
+import { currentSpace, indoorSpaceName, loadTrackingSpaces, spaceLabel, type Point, type SpaceLayout } from './ar/station';
+import { tagNetwork } from './ar/tagRouting';
 import { Navigation } from './navigation/Navigation';
-import { progressAtGps, type GeoPoint, type Journey, type JourneyProgress } from './navigation/routes';
-import { progressAtTag } from './navigation/stationProgress';
+import { displayPlaceName, progressAtGps, type GeoPoint, type Journey, type JourneyProgress } from './navigation/routes';
+import { progressAtIndoorArrival, progressAtTag, routeTransfers } from './navigation/stationProgress';
 
 type Screen = { view: 'home' | 'field' } | { view: 'map'; trip: Journey; scanning: boolean } | { view: 'ar'; trip?: Journey };
 
 export function App() {
   const video = useRef<HTMLVideoElement>(null);
+  const guideCanvas = useRef<HTMLCanvasElement>(null);
   const overlay = useRef<HTMLCanvasElement>(null);
   const modelCanvas = useRef<HTMLCanvasElement>(null);
   const file = useRef<HTMLInputElement>(null);
@@ -34,12 +38,18 @@ export function App() {
   const fullCamera = view === 'field' || view === 'ar';
   const cameraActive = fullCamera || scanning;
   const [spaces, setSpaces] = useState<SpaceLayout[]>([]);
+  const transfers = useMemo(() => trip ? routeTransfers(trip, spaces) : [], [trip, spaces]);
   const [space, setSpace] = useState<SpaceLayout>();
+  const [arrivedSpace, setArrivedSpace] = useState<SpaceLayout>();
+  const [currentCue, setIndoorCue] = useState<IndoorCue>();
   const [nearDestinationSpace, setNearDestinationSpace] = useState<string>();
   const [referenceTag, setReferenceTag] = useState<TagReference>();
   const [minimapPose, setMinimapPose] = useState<MinimapPose>();
   const [candidates, setCandidates] = useState<string[]>([]);
   const choice = useRef<{ preferredSpace: string }>(undefined);
+  const destination = useRef<TagReference>(undefined);
+  const [selectedTarget, setSelectedTarget] = useState<TagReference>();
+  const [activeRoute, setActiveRoute] = useState<{ spaceId: string; points: Point[] }>();
   const recordingSpace = useRef<string>(undefined);
   const [attempt, setAttempt] = useState(0);
   const [cameraError, setCameraError] = useState('');
@@ -69,19 +79,29 @@ export function App() {
     const controller = new AbortController();
     let close: (() => void) | undefined;
     choice.current = undefined;
-    setSpace(undefined); setReferenceTag(undefined); setMinimapPose(undefined); setCandidates([]); setSpaces([]);
+    destination.current = undefined; setSelectedTarget(undefined); setActiveRoute(undefined);
+    setSpace(undefined); setReferenceTag(undefined); setMinimapPose(undefined); setCandidates([]);
+    setArrivedSpace(undefined); setIndoorCue(undefined);
     setCameraError(''); setModelNotice(''); setIndoorHint(''); setCamera('태그 배치 불러오는 중');
     void loadTrackingSpaces(controller.signal).then(layouts => {
       if (controller.signal.aborted) return;
       setSpaces(layouts);
       let previousTag: TagReference | undefined;
-      close = openPassage(video.current!, overlay.current!, modelCanvas.current!, layouts, {
+      close = openPassage(video.current!, guideCanvas.current!, overlay.current!, modelCanvas.current!, layouts, {
         ready() { setCameraError(''); setAvailable(true); setCamera('태그 탐색 중'); },
         selection: () => choice.current,
+        destination: () => destination.current,
+        route: (spaceId, points) => setActiveRoute({ spaceId, points }),
         recordingSpace: () => recordingSpace.current,
         debug: () => debugSession.current,
         minimap: setMinimapPose,
         destinationNearby: setNearDestinationSpace,
+        cue: setIndoorCue,
+        arrived(layout) {
+          setArrivedSpace(layout);
+          const time = Date.now();
+          if (trip) setProgress(current => progressAtIndoorArrival(trip, current, layout, time));
+        },
         chooseSpace(ids) {
           setCandidates(previous => previous.length === ids.length && previous.every((id, i) => id === ids[i]) ? previous : ids);
         },
@@ -97,6 +117,7 @@ export function App() {
         },
         located(layout) {
           if (choice.current?.preferredSpace !== layout.id) choice.current = undefined;
+          setArrivedSpace(previous => previous?.id === layout.id ? previous : undefined);
           setSpace(layout); setReferenceTag(tag => tag?.spaceId === layout.id ? tag : undefined); setCandidates([]);
           setScreen(s => s.view === 'map' && s.scanning ? { view: 'ar', trip: s.trip } : s);
         },
@@ -170,8 +191,12 @@ export function App() {
   const recording = record.phase === 'recording';
   const tagLayout = referenceTag && spaces.find(layout => layout.id === referenceTag.spaceId);
   const cameraLayout = tagLayout ?? spaces.find(layout => layout.id === choice.current?.preferredSpace) ?? space ??
-    (spaces.length === 1 ? spaces[0] : spaces.find(layout => layout.id === 'default'));
+    (spaces.length === 1 ? spaces[0] : view === 'field' ? spaces.find(layout => layout.id === 'default') : undefined);
+  const customTarget = cameraLayout && selectedTarget?.spaceId === cameraLayout.id ? selectedTarget.id : undefined;
+  const visibleRoute = activeRoute && activeRoute.spaceId === cameraLayout?.id ? activeRoute.points : undefined;
+  const targetIds = useMemo(() => cameraLayout ? Object.keys(tagNetwork(cameraLayout.station).anchors).map(Number) : [], [cameraLayout]);
   const nearDestination = nearDestinationSpace !== undefined && nearDestinationSpace === cameraLayout?.id && !candidates.length;
+  const atArrival = !!arrivedSpace && arrivedSpace.id === cameraLayout?.id && !candidates.length;
   const adminSpace = view === 'field' && space ? space.id : currentSpace();
   const adminUrl = import.meta.env.BASE_URL + 'admin/' + (adminSpace === 'default' ? '' : '?space=' + encodeURIComponent(adminSpace));
   const retryCamera = () => setAttempt(a => a + 1);
@@ -184,7 +209,10 @@ export function App() {
       trackingHint = '위치 추적을 재개하려면 등록된 태그를 다시 비추세요.';
     else trackingHint = '현재 위치를 확인하려면 태그를 비추세요.';
   }
-  const guideHint = nearDestination && camera !== '위치 인식' ? '마지막으로 확인한 위치가 도착 지점 근처입니다.' : trackingHint;
+  const arrivalCue = atArrival ? indoorCue(arrivedSpace, undefined, true, customTarget) : undefined;
+  const guideHint = arrivalCue?.text ?? (nearDestination && camera !== '위치 인식'
+    ? '마지막으로 확인한 위치가 도착 지점 근처입니다.' : trackingHint);
+  const turn = !cameraError && currentCue?.text === guideHint ? currentCue?.turn : undefined;
   const spacePicker = candidates.length > 0 && available && !cameraError && <label className="tracking-space-picker">
     현재 공간
     <select value="" onChange={event => {
@@ -195,24 +223,30 @@ export function App() {
     }}>
       <option value="" disabled>공간 선택</option>
       {spaces.filter(item => candidates.includes(item.id)).map(item =>
-        <option key={item.id} value={item.id}>{spaceLabel(item.station)}</option>)}
+        <option key={item.id} value={item.id}>{view === 'field' ? spaceLabel(item.station) : indoorSpaceName(item.station)}</option>)}
     </select>
   </label>;
   return (
-    <main className={fullCamera ? 'camera-screen' : undefined} aria-label="역 길안내">
-      {view !== 'field' && <Navigation trip={trip} progress={progress} updateGps={updateGps} indoor={view === 'ar'} adminUrl={adminUrl}
-        startIndoor={() => setScreen({ view: 'ar' })}
-        openField={() => setScreen({ view: 'field' })} start={(trip, position) => {
+    <main className={fullCamera ? 'camera-screen' : undefined} data-indoor={view === 'ar'} aria-label="역 길안내">
+      {view !== 'field' && <Navigation trip={trip} progress={progress} transfers={transfers} updateGps={updateGps} indoor={view === 'ar'} adminUrl={adminUrl}
+        startIndoor={() => {
+          prepareIndoorVoice('역 안 안내를 시작합니다. 태그를 비추세요.');
+          setScreen({ view: 'ar' });
+        }} start={(trip, position) => {
           setProgress({ step: 0, position }); setScreen({ view: 'map', trip, scanning: true });
         }}
         finish={() => setScreen({ view: 'home' })}
-        scanner={{ enabled: scanning, error: scanning ? cameraError : '', retry: retryCamera, spacePicker,
-          toggle: () => setScreen(s => s.view === 'map' ? { ...s, scanning: !s.scanning } : s),
-          status: indoorHint || (available ? '역에 들어가면 후면 카메라로 AprilTag를 비추세요.' : camera) }} />}
+        scanner={{ enabled: scanning, ready: available, error: scanning ? cameraError : '', retry: retryCamera, spacePicker,
+          toggle: () => {
+            if (!scanning) prepareIndoorVoice('태그 인식을 시작합니다.');
+            setScreen(s => s.view === 'map' ? { ...s, scanning: !s.scanning } : s);
+          },
+          status: indoorHint || (available ? '' : camera) }} />}
       {cameraActive && <div className={view === 'map' ? 'passage-stage scan-preview' : 'passage-stage'}
         data-ready={available} aria-label={view === 'map' ? '역 태그 인식 카메라' : '역사 통로 AR'}>
         <video ref={video} autoPlay playsInline muted disablePictureInPicture aria-label="후면 카메라" />
-        <canvas ref={overlay} className="tag-overlay" aria-label="인식한 태그와 바닥 안내 화살표" />
+        <canvas ref={guideCanvas} className="floor-guide" aria-label="실내 경로를 따라 표시되는 바닥 유도선" />
+        <canvas ref={overlay} className="tag-overlay" aria-label="인식한 태그와 진행 방향 화살표" />
         <canvas ref={modelCanvas} className="model-overlay" aria-label="태그 위 3D 모델" />
         {view === 'ar' && available && !cameraError && !estimating && camera === '태그 탐색 중' && !nearDestination &&
           <svg className="passage-viewfinder" viewBox="0 0 100 100" fill="none" aria-hidden="true">
@@ -224,14 +258,27 @@ export function App() {
       {fullCamera && <div className="camera-controls">
         {view === 'ar' && <section className="indoor-guide" aria-label="역 안 AR 안내">
           <h1 ref={indoorHeading} tabIndex={-1}>역 안 AR 안내</h1>
-          {space && <p>{camera === '위치 인식' || estimating ? '현재 공간' : '마지막 확인 공간'} · {spaceLabel(space.station)}</p>}
-          {trip && <p>최종 도착지 · {trip.destination.name}</p>}
-          {trip && progress.station && <p role="status">{progress.step === trip.steps.length
-            ? '도착지에 도착했습니다.' : '태그로 확인한 역 · ' + stationName(progress.station)}</p>}
-          <span role="status">{cameraError || guideHint || camera}</span>
+          <span role="status">{turn ? <>
+            <strong className="turn-action">{turn.action}</strong>
+            {turn.passage && <small className="turn-passage">{turn.passage}</small>}
+          </> : cameraError || guideHint || camera}</span>
           {available && !cameraError && !candidates.length && !nearDestination &&
-            <LivePassageProgress layout={cameraLayout} pose={minimapPose} />}
-          {nearDestination && <button type="button" className="return-to-map" onClick={returnToMap}>2D 지도로 돌아가기</button>}
+            <LivePassageProgress layout={cameraLayout} points={visibleRoute} pose={minimapPose} />}
+          {!trip && cameraLayout && targetIds.length > 0 && !candidates.length && <label className="tracking-space-picker">
+            실내 목적지
+            <select value={customTarget ?? ''} onChange={event => {
+              const value = event.target.value;
+              const target = value === '' ? undefined : { spaceId: cameraLayout.id, id: Number(value) };
+              destination.current = target; setSelectedTarget(target);
+              setActiveRoute({ spaceId: cameraLayout.id, points: [] }); setArrivedSpace(undefined);
+              setIndoorCue(undefined); setNearDestinationSpace(undefined); setIndoorHint('목적지까지 안내하려면 태그를 비추세요.');
+            }}>
+              <option value="">기본 도착점{cameraLayout.station.tagGraph && ' · 태그 ' + cameraLayout.station.tagGraph.endTag}</option>
+              {targetIds.filter(id => id !== cameraLayout.station.tagGraph?.endTag).map(id => <option key={id} value={id}>태그 {id}</option>)}
+            </select>
+          </label>}
+          {trip && <p className="indoor-context">{progress.step === trip.steps.length ? '최종 도착지에 도착했습니다' : '최종 도착지'} · {displayPlaceName(trip.destination.name)}</p>}
+          {(nearDestination || atArrival) && <button type="button" className="return-to-map" onClick={returnToMap}>{trip ? '2D 지도로 돌아가기' : '실내 안내 종료'}</button>}
           {spacePicker}
           {modelNotice && <small>{modelNotice}</small>}
           {cameraError && <button type="button" onClick={retryCamera}>다시 연결</button>}
@@ -263,8 +310,9 @@ export function App() {
         </section>}
         <div className="camera-menu">
           <SignReader video={video} />
-          <ArDebugControls debug={debug} ready={available} />
-          {view === 'ar' && !nearDestination && <button type="button" className="settings-trigger" onClick={returnToMap}>{trip ? '2D 지도로' : '첫 화면'}</button>}
+          {view === 'field' && <ArDebugControls debug={debug} ready={available} />}
+          {view === 'ar' && <IndoorVoice key={(cameraLayout?.id ?? '') + '/' + (customTarget ?? 'default')} cue={arrivalCue ?? currentCue} />}
+          {view === 'ar' && !nearDestination && !atArrival && <button type="button" className="settings-trigger" onClick={returnToMap}>{trip ? '2D 지도로' : '첫 화면'}</button>}
           {view === 'field' && <div className="field-menu">
             <button type="button" disabled={working || recording || record.phase === 'saving'} onClick={returnToMap}>첫 화면</button>
             <button type="button" disabled={working || recording || record.phase === 'saving'}
@@ -273,7 +321,7 @@ export function App() {
         </div>
       </div>}
       {cameraActive && <div className="camera-dock" hidden={!fullCamera}>
-        <IndoorMinimap layout={cameraLayout} referenceTagId={tagLayout && referenceTag?.id} preview={!space && !tagLayout}
+        <IndoorMinimap route={visibleRoute} customTarget={customTarget} guided={view === 'ar'} layout={cameraLayout} referenceTagId={tagLayout && referenceTag?.id} preview={!space && !tagLayout}
           pose={minimapPose} cameraReady={available} />
       </div>}
     </main>

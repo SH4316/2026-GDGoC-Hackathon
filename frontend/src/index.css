@@ -108,6 +108,12 @@ body {
   background: #17201c; font-size: 12px; font-weight: 600;
 }
 .indoor-minimap figcaption span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.indoor-minimap .map-position-key { flex: none; display: inline-flex; align-items: center; gap: 4px; }
+.map-position-key::before {
+  content: ""; width: 7px; height: 7px; border: 1px solid white; border-radius: 50%; background: #506779;
+}
+.map-position-key[data-live="true"]::before { background: #087acc; }
+.map-position-key[data-tag="true"]::before { background: #c77813; }
 .indoor-minimap small { flex: none; margin-left: auto; color: #c1cdc6; font-size: 11px; }
 .indoor-minimap figcaption button {
   flex: none; margin-left: auto; min-height: 32px; padding: 4px 10px; cursor: pointer;
@@ -126,6 +132,44 @@ body {
   width: 100%; margin-top: 12px; background: #a6edc7; border-color: transparent; color: #15251f;
 }
 .indoor-guide .return-to-map:hover:enabled { background: #c1f6da; color: #15251f; }
+
+/* All pixels in the guided camera viewport are available to the floor projection. */
+.camera-screen[data-indoor="true"] {
+  grid-template: minmax(0, 1fr) auto auto / minmax(0, 1fr);
+  background: #15221d;
+}
+.camera-screen[data-indoor="true"] .passage-stage :is(video, canvas) { object-fit: contain; }
+.camera-screen[data-indoor="true"] .camera-controls {
+  grid-area: 2 / 1; display: flex; flex-direction: column; align-items: stretch; gap: 7px;
+  max-height: 42dvh; padding: 10px max(14px, env(safe-area-inset-right)) 8px max(14px, env(safe-area-inset-left));
+  background: #172820; border-top: 1px solid #52615a; pointer-events: auto;
+}
+.camera-screen[data-indoor="true"] .camera-dock { grid-area: 3 / 1; }
+.camera-screen[data-indoor="true"] .indoor-minimap { height: clamp(108px, 24dvh, 208px); }
+.camera-screen[data-indoor="true"] .indoor-guide { width: 100%; padding: 0; border-radius: 0; background: transparent; }
+.camera-screen[data-indoor="true"] .indoor-guide h1 { margin: 0 0 2px; font-size: 14px; font-weight: 600; color: #c9ded0; }
+.camera-screen[data-indoor="true"] .indoor-guide > [role="status"] {
+  font-size: clamp(18px, 2.4vw, 22px); font-weight: 700; line-height: 1.35; word-break: keep-all;
+}
+.camera-screen[data-indoor="true"] .indoor-context { margin: 5px 0 0; font-size: 13px; }
+.indoor-guide .turn-action { display: block; font-size: clamp(22px, 5vw, 28px); line-height: 1.25; }
+.indoor-guide .turn-passage { margin-top: 2px; color: #d5e9df; font-size: 14px; font-weight: 500; }
+.camera-screen[data-indoor="true"] .camera-menu { justify-content: flex-start; }
+.camera-screen[data-indoor="true"] .camera-menu button { padding-inline: 10px; }
+.camera-screen[data-indoor="true"]:has(.camera-dock:empty) .camera-controls { padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+.camera-screen[data-indoor="true"] .return-to-map { margin-top: 6px; }
+.voice-toggle[aria-pressed="true"] { color: #b1efd0; }
+@media (min-width: 900px), (orientation: landscape) and (max-height: 560px) {
+  .camera-screen[data-indoor="true"] { grid-template: auto minmax(0, 1fr) / minmax(0, 1fr) clamp(245px, 38vw, 420px); }
+  .camera-screen[data-indoor="true"] .passage-stage { grid-area: 1 / 1 / 3 / 2; }
+  .camera-screen[data-indoor="true"] .camera-controls {
+    grid-area: 1 / 2; max-height: 65dvh; border-top: 0;
+    padding-top: max(10px, env(safe-area-inset-top));
+  }
+  .camera-screen[data-indoor="true"] .camera-dock { grid-area: 2 / 2; min-height: 0; }
+  .camera-screen[data-indoor="true"] .indoor-minimap { height: 100%; }
+  .camera-screen[data-indoor="true"] .sign-panel { width: min(21rem, 100%); }
+}
 
 .tracking-space-picker { display: grid; gap: 4px; margin: 6px 0; font-size: 13px; }
 .tracking-space-picker select { min-height: 44px; max-width: 100%; min-width: 0; padding: 0 8px; font: inherit; }

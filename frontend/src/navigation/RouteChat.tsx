@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { currentOrigin, formatMeters, readRoute, type Journey, type Place, type RouteMode } from './routes';
+import { currentOrigin, displayPlaceName, formatMeters, readRoute, type Journey, type Place, type RouteMode } from './routes';
 import './route-chat.css';
 
 type Source = { title: string; url: string };
@@ -58,7 +58,7 @@ function RouteOffer({ trip, accept }: { trip: Journey; accept: (trip: Journey) =
   return <article className="chat-offer" aria-label="제안된 경로">
     <div className="chat-offer-title"><strong>경로 제안</strong><span>{trip.provider === 'tmap' ? 'TMAP' : '카카오맵'}</span></div>
     <dl>{([['출발', trip.origin], ['도착', trip.destination]] as const).map(([label, place]) =>
-      <div key={label}><dt>{label}</dt><dd>{place.name}{place.detail && <small>{place.detail}</small>}</dd></div>)}</dl>
+      <div key={label}><dt>{label}</dt><dd>{displayPlaceName(place.name)}{place.detail && <small>{place.detail}</small>}</dd></div>)}</dl>
     <p>{proposalSummary(trip)}</p>
     <button type="button" onClick={() => accept(trip)}>수락하고 길 안내 시작 <Icon name="arrow" size={18}/></button>
   </article>;

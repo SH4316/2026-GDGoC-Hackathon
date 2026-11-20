@@ -39,6 +39,30 @@ type ApiResponse = { status?: string; provider?: RouteProvider; route?: ApiRoute
 const geoPoint = (p: unknown): p is GeoPoint => Array.isArray(p) && p.length === 2 &&
   Number.isFinite(p[0]) && Math.abs(p[0]) <= 180 && Number.isFinite(p[1]) && Math.abs(p[1]) <= 90;
 
+// Older normalized TMAP responses retained the adapter's exact instruction and polyline,
+// but omitted structured stops. Recover endpoints only for two connecting subway legs.
+function recoverCachedTransferStops(steps: RouteStep[]) {
+  function cachedLeg(step: RouteStep) {
+    if (step.kind !== '지하철' || step.rail || step.points.length < 2) return;
+    const match = /^(.+?)에서 (.+?) 탑승 → (.+?)에서 하차$/.exec(step.instruction);
+    if (!match) return;
+    const [first, last] = [step.points[0], step.points.at(-1)!];
+    return { step, from: { name: match[1], point: first }, to: { name: match[3], point: last }, line: match[2] };
+  }
+  let previous: ReturnType<typeof cachedLeg>;
+  for (const step of steps) {
+    if (step.kind === '도보') continue;
+    const next = cachedLeg(step);
+    // Platforms in one interchange can be hundreds of metres apart.
+    if (previous && next && previous.to.name === next.from.name && distanceMeters(previous.to.point, next.from.point) <= 1000) {
+      for (const leg of [previous, next]) {
+        leg.step.rail = { stops: [leg.from, leg.to], lines: [leg.line] };
+      }
+    }
+    previous = next;
+  }
+}
+
 export async function findRoute(origin: Place, destination: Place, mode: RouteMode, signal: AbortSignal): Promise<Journey> {
   const [x, y] = origin.point, [endX, endY] = destination.point;
   if (x === endX && y === endY) throw new Error('출발지와 도착지가 같습니다. 다른 지점을 선택하세요.');
@@ -65,11 +89,20 @@ export function readRoute(data: ApiResponse, origin: Place, destination: Place, 
         points: row.path?.points?.filter(geoPoint) ?? [] };
     });
     if (steps.some(step => step.points.length >= 2)) {
+      if (mode === 'transit' && data.provider === 'tmap') recoverCachedTransferStops(steps);
       return { origin, destination, mode, provider: data.provider, steps,
         meters: candidate.properties?.totalDistance, seconds: candidate.properties?.totalTime };
     }
   }
   throw new Error('지도에 표시할 경로 좌표가 없습니다. 다른 출발·도착지를 선택하세요.');
+}
+
+export function displayPlaceName(name: string) {
+  const station = /^(.+역)\s*\[([^\[\]]+)\]$/.exec(name);
+  if (!station) return name;
+  const line = station[2].trim();
+  if (!/(?:선|철도|경전철|라인)$|^GTX-[A-Z]$/i.test(line)) return name;
+  return station[1] + ' · ' + line.replace(/^수도권\s*(?=\d+호선)/, '');
 }
 
 export function formatMeters(meters: number) {

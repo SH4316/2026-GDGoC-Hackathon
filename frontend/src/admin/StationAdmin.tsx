@@ -5,6 +5,8 @@ import {
 } from '../ar/station';
 import { StationPlan, type PlottedTag } from './StationPlan';
 import { StationLinks } from './StationLinks';
+import { TagConnections, draftGraph, graphPayload, removeGraphTag, type GraphDraft } from './TagConnections';
+import { defaultWalk } from '../ar/tagRouting';
 import { TagPrint } from './TagPrint';
 import './admin.css';
 
@@ -13,8 +15,9 @@ const baseUrl = import.meta.env.BASE_URL;
 
 type PointDraft = [string, string];
 type AssetDraft = { model?: TagModel; upload?: File };
-type TagDraft = AssetDraft & { id: string; center: PointDraft; surface?: TagSurface; yaw: string; size: string };
+type TagDraft = AssetDraft & { id: string; center: PointDraft; walkPoint?: PointDraft; surface?: TagSurface; yaw: string; size: string };
 type LayoutDraft = {
+  graph?: GraphDraft;
   stationLinks: StationLink[];
   terrain: AssetDraft & { name: string; outline: PointDraft[] };
   route: PointDraft[];
@@ -44,11 +47,12 @@ function terrainDraft(terrain?: Terrain): LayoutDraft['terrain'] {
 
 function layoutDraft({ station }: StationDocument): LayoutDraft {
   return {
+    graph: draftGraph(station),
     stationLinks: station.stationLinks ?? [],
     terrain: terrainDraft(station.terrain),
     route: station.route.map(draftPoint),
     tags: station.tags.map(tag => ({
-      id: String(tag.id), center: draftPoint(tag.center), surface: tag.surface, yaw: String(tag.yawDeg),
+      id: String(tag.id), center: draftPoint(tag.center), walkPoint: tag.walkPoint && draftPoint(tag.walkPoint), surface: tag.surface, yaw: String(tag.yawDeg),
       size: tag.modelSizeM === undefined ? '' : String(tag.modelSizeM), model: tag.model,
     })),
   };
@@ -147,8 +151,9 @@ function tagPayload(tags: TagDraft[]) {
       throw new Error('중복되지 않는 0~586 사이의 태그 ID를 입력하세요.');
     if (!validPoint(tag.center) || !numeric(tag.yaw) || (tag.size && !(numeric(tag.size) && Number(tag.size) > 0)))
       throw new Error('태그 ' + id + '의 좌표와 방향을 입력하고, 모델 크기는 양수로 지정하세요.');
+    if (tag.walkPoint && !validPoint(tag.walkPoint)) throw new Error('태그 ' + id + '의 보행 지점 좌표를 입력하세요.');
     used.add(id);
-    return { id, center: toPoint(tag.center), surface: tag.surface, yawDeg: Number(tag.yaw), modelSizeM: tag.size ? Number(tag.size) : undefined };
+    return { id, center: toPoint(tag.center), walkPoint: tag.walkPoint && toPoint(tag.walkPoint), surface: tag.surface, yawDeg: Number(tag.yaw), modelSizeM: tag.size ? Number(tag.size) : undefined };
   });
 }
 
@@ -298,6 +303,7 @@ export function StationAdmin() {
       const hasTerrain = Boolean(document.station.terrain || name || draft.terrain.model || draft.terrain.upload || draft.terrain.outline.length);
       if ((isNew || hasTerrain) && !name) throw new Error('공간 이름을 입력하세요.');
       const tags = tagPayload(draft.tags);
+      const tagGraph = draft.graph ? graphPayload(draft.graph, tags) : null;
       if (!draft.route.every(validPoint)) throw new Error('안내 경로의 모든 좌표를 입력하세요.');
       if (draft.terrain.outline.length && (draft.terrain.outline.length < 3 || !draft.terrain.outline.every(validPoint)))
         throw new Error('바닥 경계를 그리려면 좌표를 3개 이상 입력하세요.');
@@ -315,7 +321,7 @@ export function StationAdmin() {
       headers.set('Content-Type', 'application/json');
       if (!isNew) headers.set('If-Match', document.etag);
       const response = await fetch(isNew ? stationUrl + '/spaces' : spaceUrl(spaceId), {
-        method: isNew ? 'POST' : 'PUT', headers, body: JSON.stringify({ ...document.station, terrain, route, tags, stationLinks: draft.stationLinks }),
+        method: isNew ? 'POST' : 'PUT', headers, body: JSON.stringify({ ...document.station, terrain, route, tags, tagGraph, stationLinks: draft.stationLinks }),
       });
       setConflict(response.status === 412);
       if (response.status === 409) await spaceCatalog().then(setSpaces).catch(() => {});
@@ -347,10 +353,22 @@ export function StationAdmin() {
   const tagOwner = tag && validTagId(tag.id) ? owners.get(Number(tag.id)) : undefined;
   const file = draft?.terrain.model?.file;
   const upload = draft?.terrain.upload;
-  const route = draft?.route.every(validPoint) ? draft.route.map(toPoint) : [];
+  let route = draft?.route.every(validPoint) ? draft.route.map(toPoint) : [];
   const outline = draft?.terrain.outline.every(validPoint) ? draft.terrain.outline.map(toPoint) : [];
   const tags: PlottedTag[] = draft?.tags.flatMap((t, index) => validPoint(t.center) ?
     [{ index, id: t.id, center: toPoint(t.center), yaw: numeric(t.yaw) ? Number(t.yaw) : 0, surface: t.surface }] : []) ?? [];
+  let passages: Point[][] = [];
+  if (draft?.graph && document) {
+    route = [];
+    const nodes = draft.tags.map(t => t.walkPoint ?? t.center);
+    passages = draft.graph.edges.flatMap(([a, b]) => nodes[a] && nodes[b] && validPoint(nodes[a]) && validPoint(nodes[b])
+      ? [[toPoint(nodes[a]), toPoint(nodes[b])]] : []);
+    try {
+      const tags = tagPayload(draft.tags);
+      const tagGraph = graphPayload(draft.graph, tags);
+      route = defaultWalk({ ...document.station, tags, tagGraph });
+    } catch { /* Keep drawing completed edges while another field is incomplete. */ }
+  }
   const distance = route.reduce((length, [x, y], i) => i ? length + Math.hypot(x - route[i - 1][0], y - route[i - 1][1]) : 0, 0);
 
   return <>
@@ -363,7 +381,7 @@ export function StationAdmin() {
         <a href="#terrain"><Icon name="layers" />지형 데이터</a>
         <a href="#tags"><Icon name="tag" />AprilTag</a>
       </nav>
-      <a className="admin-exit" href={baseUrl + '?view=ar&space=' + encodeURIComponent(isNew ? 'default' : spaceId)}><Icon name="exit" />AR 화면</a>
+      <a className="admin-exit" href={baseUrl + '?view=ar&space=' + encodeURIComponent(isNew ? 'default' : spaceId)}><Icon name="exit" />실험 기록 카메라</a>
     </aside>
 
     <main className="admin-workspace" id="overview">
@@ -429,7 +447,7 @@ export function StationAdmin() {
                   <TerrainPreview file={file} upload={upload} route={route} tags={tags} sideM={document.station.tagSideM} panOnDrag={panOnDrag}
                     armed={placing && !busy} selected={selected} onPlace={placeTag} onSelect={selectMarker} />
                 </Suspense> :
-                <StationPlan outline={outline} route={route} tags={tags} selected={selected} select={selectMarker} />}
+                <StationPlan passages={passages} outline={outline} route={route} tags={tags} selected={selected} select={selectMarker} />}
               <div className="admin-map-legend">
                 {(outline.length >= 3 || view === 'model') && <span><i className="legend-floor" />{view === 'model' ? '지형 모델' : '바닥 경계'}</span>}
                 {route.length >= 2 && <span><i className="legend-route" />안내 경로</span>}
@@ -456,8 +474,9 @@ export function StationAdmin() {
                 <div className="admin-geometry">
                   <PointEditor label="바닥 경계" points={draft.terrain.outline} min={3} max={256} optional
                     change={points => update({ terrain: { ...draft.terrain, outline: points } })} />
-                  <PointEditor label="안내 경로" points={draft.route} min={2} max={4096} optional
-                    change={points => update({ route: points })} />
+                  <TagConnections tags={draft.tags} graph={draft.graph} change={graph => update({ graph })} />
+                  {!draft.graph && <PointEditor label="안내 경로" points={draft.route} min={2} max={4096} optional
+                    change={points => update({ route: points })} />}
                 </div>
                 <p className="admin-coordinate-note">설치 좌표는 미터 단위입니다. 오른쪽이 +X, 정면이 +Y입니다.</p>
               </div>
@@ -499,6 +518,13 @@ export function StationAdmin() {
                 <label>모델 크기 (m)<input type="number" step="any" value={tag.size} placeholder={String(document.station.tagSideM)}
                   onChange={e => update({ tags: draft.tags.map((t, i) => i === selected ? { ...t, size: e.target.value } : t) })} /></label>
               </div>
+              {draft.graph && <div className="tag-connections">
+                <label><input type="checkbox" checked={!!tag.walkPoint} onChange={e => update({ tags: draft.tags.map((t, i) =>
+                  i === selected ? { ...t, walkPoint: e.target.checked ? [...t.center] : undefined } : t) })} /> 별도 보행 지점 지정</label>
+                {tag.walkPoint && <div className="tag-edge">{(['X', 'Y'] as const).map((axis, j) => <label key={axis}>보행 {axis} (m)
+                  <input type="number" step="any" value={tag.walkPoint![j]} onChange={e => update({ tags: draft.tags.map((t, i) =>
+                    i === selected ? { ...t, walkPoint: j === 0 ? [e.target.value, t.walkPoint![1]] : [t.walkPoint![0], e.target.value] } : t) })} /></label>)}</div>}
+              </div>}
               {tagOwner && <p role="status">‘{tagOwner}’에서 태그 {tag.id}번을 사용하고 있습니다. 다른 번호를 선택하세요.</p>}
               <p>{tag.surface ? '표면 높이 ' + tag.surface.heightM.toFixed(3) + ' m · 방향은 선택한 면에서 시계 방향으로 잽니다.'
                 : '방향은 +Y에서 시계 방향으로 잽니다.'} 모델 크기는 가장 긴 변을 기준으로 맞춥니다.</p>
@@ -514,7 +540,7 @@ export function StationAdmin() {
               <ModelField asset={tag} label="태그 모델" fallback="기본 위치 핀" onError={setError}
                 change={asset => update({ tags: draft.tags.map((t, i) => i === selected ? { ...t, model: asset.model, upload: asset.upload } : t) })} />
               <button type="button" className="admin-text-button admin-delete" onClick={() => {
-                update({ tags: draft.tags.filter((_, i) => i !== selected) });
+                update({ tags: draft.tags.filter((_, i) => i !== selected), graph: removeGraphTag(draft.graph, selected) });
                 setSelected(null);
               }}><Icon name="trash" />태그 삭제</button>
             </div>}

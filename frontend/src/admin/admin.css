@@ -324,3 +324,10 @@ button:disabled { cursor: default; }
 .admin-edit-id { min-height: 36px; padding: 3px; border: 0; background: transparent; color: var(--accent); font-weight: 650; }
 .admin-edit-id:hover { text-decoration: underline; }
 .admin-row-print { min-height: 36px; padding: 4px 8px; }
+
+.tag-connections { display: grid; gap: 10px; }
+.tag-connections > label { display: flex; align-items: center; gap: 8px; }
+.tag-connections input[type="checkbox"] { min-width: 16px; width: 16px; height: 16px; min-height: 16px; }
+.tag-connections p { margin: 0; font-size: 13px; }
+.tag-edge { display: flex; align-items: end; gap: 8px; flex-wrap: wrap; }
+.tag-edge label { flex: 1; min-width: 80px; }

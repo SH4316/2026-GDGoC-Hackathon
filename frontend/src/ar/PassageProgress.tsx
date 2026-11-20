@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { MinimapPose } from './indoorTracking';
 import { distanceAlong, measurePassage, passageMeters, type PassageRoute } from './passageRoute';
-import type { SpaceLayout } from './station';
+import type { Point, SpaceLayout } from './station';
 import './passage-progress.css';
 
 export function PassageBar({ route, distance }: { route: PassageRoute; distance: number }) {
@@ -11,8 +11,8 @@ export function PassageBar({ route, distance }: { route: PassageRoute; distance:
   </div>;
 }
 
-export function LivePassageProgress({ layout, pose }: { layout?: SpaceLayout; pose?: MinimapPose }) {
-  const route = useMemo(() => layout && measurePassage(layout.station.route), [layout]);
+export function LivePassageProgress({ layout, points, pose }: { layout?: SpaceLayout; points?: Point[]; pose?: MinimapPose }) {
+  const route = useMemo(() => layout && measurePassage(points ?? layout.station.route), [layout, points]);
   if (!route || !pose || pose.spaceId !== layout?.id || pose.source === 'last') return null;
   const along = distanceAlong(route, pose.point);
   if (along === undefined) return null;

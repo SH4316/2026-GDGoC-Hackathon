@@ -29,7 +29,7 @@ const tagSurface = z.object({ heightM: num, right: axis, up: axis })
   .refine(s => Math.abs(s.right.reduce((sum, v, i) => sum + v * s.up[i], 0)) < .0001,
     '태그의 가로축과 세로축은 직각이어야 합니다.');
 const tag = z.object({
-  surface: tagSurface.optional(),
+  surface: tagSurface.optional(), walkPoint: xy.optional(),
   id: tagId, center: xy, yawDeg: num,
   modelSizeM: positive.optional(),
   model: modelReference.optional(),
@@ -45,6 +45,9 @@ const stationSnapshot = z.object({
       '같은 역과 노선을 두 번 연결할 수 없습니다.')
     .refine(stops => ['start', 'end'].every(role => stops.filter(s => s.routeEndpoint === role).length <= 1),
       '출발점과 도착점에는 각각 한 노선만 지정할 수 있습니다.').optional(),
+  tagGraph: z.object({
+    startTag: tagId, endTag: tagId, edges: z.array(z.tuple([tagId, tagId])).max(8192),
+  }).nullish().transform(graph => graph ?? undefined),
   tagSideM: positive, tags: z.array(tag).max(587), route: z.array(xy).max(4096).refine(points => points.length !== 1, '안내 경로에는 점이 두 개 이상 필요합니다.'),
   camera: z.object({ diagonalFovDeg: positive.optional(), calibration: calibration.nullish() }),
   terrain: z.object({
@@ -55,6 +58,28 @@ const stationSnapshot = z.object({
 });
 export const stationSchema = stationSnapshot
   .refine(s => new Set(s.tags.map(t => t.id)).size === s.tags.length, '태그 ID가 중복되었습니다.')
+  .superRefine((s, ctx) => {
+    const graph = s.tagGraph;
+    if (!graph) return;
+    const points = new Map(s.tags.map(t => [t.id, t.walkPoint ?? t.center]));
+    const issue = (message: string) => ctx.addIssue({ code: 'custom', path: ['tagGraph'], message });
+    if (graph.startTag === graph.endTag || !points.has(graph.startTag) || !points.has(graph.endTag))
+      return issue('기본 출발·도착 태그는 이 공간의 서로 다른 태그여야 합니다.');
+    const seen = new Set<string>();
+    const adjacent = new Map(s.tags.map(t => [t.id, [] as number[]]));
+    for (const [a, b] of graph.edges) {
+      const pa = points.get(a), pb = points.get(b);
+      if (!pa || !pb || a === b) return issue('통로 양쪽에 이 공간의 서로 다른 태그를 지정하세요.');
+      const key = [Math.min(a, b), Math.max(a, b)].join('/');
+      if (seen.has(key)) return issue('같은 통로를 두 번 연결할 수 없습니다.');
+      if (Math.hypot(pa[0] - pb[0], pa[1] - pb[1]) < .05) return issue('연결된 보행 지점은 5 cm 이상 떨어져야 합니다.');
+      seen.add(key);
+      adjacent.get(a)!.push(b); adjacent.get(b)!.push(a);
+    }
+    const reached = new Set([graph.startTag]);
+    for (const id of reached) for (const next of adjacent.get(id)!) reached.add(next);
+    if (!reached.has(graph.endTag)) issue('기본 출발 태그에서 도착 태그까지 통로를 연결하세요.');
+  })
   .refine(s => s.route.slice(1).every(([x,y], i) => Math.hypot(x-s.route[i][0], y-s.route[i][1]) >= 0.05),
     '인접한 경로점은 5 cm 이상 떨어져야 합니다.')
   .refine(s => s.camera.calibration || (s.camera.diagonalFovDeg! > 15 && s.camera.diagonalFovDeg! < 150),

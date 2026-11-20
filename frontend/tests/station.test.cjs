@@ -9,15 +9,20 @@ const corridor = JSON.parse(readFileSync(join(__dirname, '../../backend/src/stat
 // Images for the original field kit use IDs 0–3 at these same four locations.
 const station = { ...corridor, tags: corridor.tags.map((tag, id) => ({ ...tag, id })) };
 const workerCode = readFileSync(join(root, 'ar/tracker.js'), 'utf8');
+const { tagNetwork, routeTree, defaultWalk } = require('../src/ar/tagRouting.ts');
 const W = 640, H = 800;
 
 function startWorker(cv, config) {
   let reply;
   const self = { cv, postMessage(data) { reply = data; } };
   runInNewContext(workerCode, { self, importScripts() {}, console });
-  self.onmessage({ data: { type: 'init', library: '', ...config } });
+  const spaces = (config.spaces ?? [{ id: 'default', station: config.station }]).map(space => ({
+    ...space, tree: routeTree(tagNetwork(space.station)),
+  }));
+  self.onmessage({ data: { type: 'init', library: '', spaces } });
   assert.equal(reply.type, 'ready', reply.message);
   return (rgba, selection) => {
+    if (selection?.destination) self.onmessage({ data: { type: 'destination', ...selection.destination } });
     self.onmessage({ data: { type: 'frame', w: W, h: H, rgba: rgba.buffer, ...selection } });
     assert.equal(reply.type, 'frame');
     return reply;
@@ -118,6 +123,12 @@ test('floor localization, route turn, tag loss and reacquisition', async () => {
   const straight=scene(cv,floor,[[0,0],[1,1],[2,2]]);
   const fix=locate(straight);
   checkFix(fix,eye,floor,1);
+  const stripe = fix.guide.flat().filter(([u,v]) => u >= 0 && u < W && v >= 0 && v < H).map(p => floor(...p));
+  assert.ok(stripe.some(([x,y]) => Math.abs(x - .045) < .025 && y > .1 && y < 1.8));
+  assert.ok(stripe.some(([x,y]) => Math.abs(x + .045) < .025 && y > .1 && y < 1.8));
+  assert.equal(fix.maneuver.kind, 'straight');
+  const reversed = worker(cv, { ...station, route: [[0, 2], [0, -2]] })(straight);
+  assert.equal(reversed.maneuver.kind, 'realign');
   assert.ok(fix.ids.length >= 2, 'multi-tag consensus');
   assert.equal(locate(scene(cv,floor,[]), seen => assert.equal(seen.length, 0)), null);
   const unknown = scene(cv,floor,[[1,42]]);
@@ -132,11 +143,27 @@ test('floor localization, route turn, tag loss and reacquisition', async () => {
   checkFix(locate(scene(cv,floor,[[1,1]])),eye,floor,1);
 
   const turnEye=[.03,1.47,1.10], turnFloor=floorAt(turnEye,[.46,2.15,0]);
-  checkFix(locate(scene(cv,turnFloor,[[2,2],[3,3]])),turnEye,turnFloor,0);
+  const cornerImage = scene(cv,turnFloor,[[2,2],[3,3]]);
+  const rightTurn = locate(cornerImage);
+  checkFix(rightTurn,turnEye,turnFloor,0);
+  const cornerStripe = rightTurn.guide.flat().map(p => turnFloor(...p));
+  assert.ok(cornerStripe.some(([x,y]) => Math.abs(x) < .07 && y < 1.8), 'incoming leg on the floor');
+  assert.ok(cornerStripe.some(([x,y]) => x > .4 && Math.abs(y - 2) < .07), 'outgoing leg turns with the route');
+  assert.equal(rightTurn.maneuver.kind, 'right');
+  const leftStation = { ...station, route: [[0,0],[0,2],[-1.75,2]],
+    stationLinks: [{ name: '초지', line: '서해선', code: 'S26', routeEndpoint: 'end' }] };
+  const leftTurn = worker(cv, leftStation)(cornerImage);
+  const { indoorCue } = await import('../src/ar/indoorGuidance.ts');
+  const layout = { id: 'transfer', station: leftStation };
+  assert.equal(indoorCue(layout, leftTurn.maneuver, false).text, '여기서 좌회전하세요. 서해선 환승 통로입니다.');
+  assert.equal(indoorCue(layout, rightTurn.maneuver, false).text, '여기서 우회전하세요. 서해선 환승 통로입니다.');
   const arrival=floorAt([1.7,2,1.1],[1.05,2.2,0]);
   const destination=locate(scene(cv,arrival,[[3,3]]));
   assert.ok(destination?.position);
   assert.equal(destination.arrived, true);
+  assert.equal(indoorCue(layout, destination.maneuver, destination.arrived).text, '서해선 환승 위치에 도착했습니다.');
+  assert.equal(indoorCue(layout, destination.maneuver, destination.arrived).spokenText, '목적지에 도착하였습니다.');
+  assert.equal(destination.guide.length, 0);
   assert.equal(destination.arrow,null);
 
   const cal={width:W,height:H,fx:650,fy:685,cx:W/2+9,cy:H/2-7,distortion:[0,0,0,0,0]};
@@ -183,6 +210,7 @@ test('a wall-mounted tag localizes in the saved surface frame without a walking 
   const expected = [eye[0], 2 - eye[2], 1 + eye[1]];
   assert.ok(Math.hypot(...fix.position.map((x, i) => x - expected[i])) < .12);
   assert.equal(fix.arrow, null);
+  assert.equal(fix.guide.length, 0);
   assert.equal(fix.arrived, false);
 });
 
@@ -306,7 +334,9 @@ test('floor matching bridges a brief occlusion, and a broken visual track needs 
     floorAnchor: { spaceId: 'default', timeMs: reference } });
   assert.ok(at(tag, 0).fix);
   assert.equal(at(blank, 120, 0).floorMotion, undefined);
-  assert.equal(at(texture, 240, 0).floorMotion.referenceTimeMs, 0);
+  const matched = at(texture, 240, 0).floorMotion;
+  assert.equal(matched.referenceTimeMs, 0);
+  assert.ok(matched.guide.length > 0, 'a validated floor match reprojects the stripe without a tag');
   assert.equal(at(texture, 360, 0).floorMotion, undefined, 'caller skipped the last observation');
   assert.equal(at(texture, 480, 240).floorMotion.referenceTimeMs, 240);
   for (let time = 600; time <= 2400; time += 120) assert.equal(at(blank, time, 480).floorMotion, undefined);
@@ -331,4 +361,55 @@ test('a single implausible tag jump is held, a repeated relocation or a new sigh
   assert.equal(at(away, 300).fix, null);
   assert.ok(at(away, 400).fix);
   assert.ok(at(center, 2000).fix);
+});
+
+
+test('camera fixes follow the shortest registered passages, reroute at a branch and stop at disconnected tags', async () => {
+  const { cv } = await new Promise(resolve => require('@techstark/opencv-js').then(cv => resolve({ cv })));
+  const tags = [...station.tags, { id: 7, center: [-3, 0], yawDeg: 0 }, { id: 8, center: [1, 2], yawDeg: 0 }];
+  const map = { ...station, tags, tagGraph: { startTag: 0, endTag: 3, edges: [[0, 7], [7, 3], [0, 1], [1, 2], [2, 3]] } };
+  assert.deepEqual(defaultWalk(map), [0, 1, 2, 3].map(id => tags[id].center));
+  const track = startWorker(cv, { station: map });
+  const eye = [0, -.45, 1.15], floor = floorAt(eye, [0, .62, 0]);
+  const first = track(scene(cv, floor, [[0, 0]]));
+  assert.deepEqual(JSON.parse(JSON.stringify(first.route)), defaultWalk(map));
+  const branch = track(scene(cv, floor, [[0, 7]]));
+  assert.deepEqual(Array.from(branch.fix.ids), [7]);
+  assert.deepEqual(Array.from(branch.route.at(-1)), tags[3].center);
+  assert.ok(branch.route.some(p => p[0] === -3));
+  const lost = track(scene(cv, floor, []));
+  assert.equal(lost.fix, null);
+  const blocked = track(scene(cv, floor, [[1, 8]]));
+  assert.ok(blocked.fix);
+  assert.deepEqual(Array.from(blocked.route), []);
+  assert.equal(blocked.fix.arrow, null);
+  assert.equal(blocked.fix.arrived, false);
+  assert.equal(blocked.fix.guide.length, 0);
+  const network = tagNetwork(map);
+  const back = track(scene(cv, floor, [[1, 1]]), { destination: { spaceId: 'default', tree: routeTree(network, network.anchors[0]) } });
+  assert.deepEqual(Array.from(back.route.at(-1)), tags[0].center);
+  assert.equal(back.fix.arrived, false);
+});
+
+test('a destination visible across a parallel aisle cannot complete a long connected walk', async () => {
+  const { cv } = await new Promise(resolve => require('@techstark/opencv-js').then(cv => resolve({ cv })));
+  const tags = station.tags.map((tag, i) => ({ ...tag, walkPoint: [[0, 0], [0, 6], [.2, 6], [.2, 0]][i] }));
+  const map = { ...station, tags, tagGraph: { startTag: 0, endTag: 3, edges: [[0,1], [1,2], [2,3]] } };
+  const track = startWorker(cv, { station: map });
+  const atStart = floorAt([0, 0, 1.15], [0, .55, 0]);
+  const { fix } = track(scene(cv, atStart, [[0,0], [1,1]]));
+  assert.ok(fix);
+  assert.equal(fix.arrived, false);
+  assert.ok(fix.destinationDistance > 12);
+});
+
+test('legacy corridors keep their corners, endpoints and printed IDs without shortcutting a crossing', () => {
+  const network = tagNetwork(corridor);
+  assert.deepEqual(network.points[network.start], corridor.route[0]);
+  assert.deepEqual(network.points[network.end], corridor.route.at(-1));
+  assert.deepEqual(network.points[network.anchors[5]], [0, 1]);
+  assert.equal(routeTree(network).costs[network.start], 3.75);
+  const crossing = tagNetwork({ route: [[0, 0], [2, 2], [0, 2], [2, 0]], tags: [{ id: 9, center: [1, 1] }] });
+  assert.equal(crossing.anchors[9], undefined);
+  assert.ok(routeTree(crossing).costs[crossing.start] > 7);
 });
