@@ -1,4 +1,6 @@
-import { defaultWalk } from './tagRouting';
+import { copy, lineLabel, type Language } from '../i18n/language';
+import { stationLabel } from '../i18n/stationLabel';
+import { trackingLayout, type TagNetwork } from './tagRouting';
 
 export type Point = [number, number];
 export type TagModel = { file: string; name: string };
@@ -15,25 +17,26 @@ export type Station = {
   tags: StationTag[];
   route: Point[];
   tagGraph?: { startTag: number; endTag: number; edges: [number, number][] };
+  autoRoute?: false | { startTag?: number; endTag?: number };
   terrain?: Terrain;
   camera: { diagonalFovDeg?: number; calibration?: {
     width: number; height: number; fx: number; fy: number; cx: number; cy: number; distortion: number[];
   } | null };
 };
 export type StationDocument = { station: Station; etag: string };
-export type SpaceLayout = { id: string; station: Station };
-export function spaceLabel(station: Station) {
-  const name = station.terrain?.name ?? '기본 공간';
-  const links = station.stationLinks?.map(stop => stationName(stop.name) + ' ' + stop.line);
+export type SpaceLayout = { id: string; station: Station; network?: TagNetwork };
+export function spaceLabel(station: Station, language: Language = 'ko') {
+  const name = station.terrain?.name ?? copy[language]('기본 공간');
+  const links = station.stationLinks?.map(stop => stationLabel(stationName(stop.name), language) + ' ' + lineLabel(stop.line, language));
   return links?.length ? links.join(' / ') + ' · ' + name : name;
 }
 
-export function indoorSpaceName(station: Station) {
+export function indoorSpaceName(station: Station, language: Language = 'ko') {
   const start = station.stationLinks?.find(link => link.routeEndpoint === 'start');
   const end = station.stationLinks?.find(link => link.routeEndpoint === 'end');
   if (start && end && stationName(start.name) === stationName(end.name))
-    return `${stationName(start.name)} · ${start.line} → ${end.line}`;
-  return spaceLabel(station);
+    return `${stationLabel(stationName(start.name), language, true)} · ${lineLabel(start.line, language)} → ${lineLabel(end.line, language)}`;
+  return spaceLabel(station, language);
 }
 export const stationUrl = import.meta.env.BASE_URL + 'api/station';
 
@@ -65,8 +68,45 @@ export async function loadLayouts(signal?: AbortSignal): Promise<SpaceLayout[]> 
   return response.json();
 }
 
-export async function loadTrackingSpaces(signal: AbortSignal): Promise<SpaceLayout[]> {
+async function trackingSnapshot(signal: AbortSignal, previous?: { etag: string; version: string }) {
   const id = new URLSearchParams(location.search).get('space');
-  const spaces = id ? [{ id, station: (await loadStation(signal, id)).station }] : await loadLayouts(signal);
-  return spaces.map(({ id, station }) => ({ id, station: station.tagGraph ? { ...station, route: defaultWalk(station) } : station }));
+  const response = await fetch(id ? spaceUrl(id) : stationUrl + '/layouts', {
+    signal, cache: 'no-store', headers: previous?.etag ? { 'If-None-Match': previous.etag } : undefined,
+  });
+  if (response.status === 304 && previous) return;
+  await stationResponse(response);
+  const etag = stationVersion(response);
+  if (etag && etag === previous?.etag) return;
+  const body = await response.text(), version = etag || body;
+  if (version === previous?.version) return;
+  const payload = JSON.parse(body);
+  const spaces: SpaceLayout[] = id ? [{ id, station: payload }] : payload;
+  return { etag, version, layouts: spaces.map(trackingLayout) };
+}
+
+export async function loadTrackingSpaces(signal: AbortSignal) {
+  return (await trackingSnapshot(signal))!.layouts;
+}
+
+export function watchTrackingSpaces(signal: AbortSignal, paused: () => boolean,
+                                   changed: (layouts: SpaceLayout[]) => void, failed: () => void) {
+  let previous: { etag: string; version: string } | undefined;
+  let loading = false;
+  async function refresh() {
+    if (loading || signal.aborted || document.hidden || paused()) return;
+    loading = true;
+    try {
+      const next = await trackingSnapshot(signal, previous);
+      if (next && !signal.aborted && !paused()) {
+        changed(next.layouts);
+        previous = { etag: next.etag, version: next.version };
+      }
+    } catch {
+      if (!signal.aborted && !previous) failed();
+    } finally { loading = false; }
+  }
+  const timer = window.setInterval(refresh, 5000);
+  document.addEventListener('visibilitychange', refresh, { signal });
+  signal.addEventListener('abort', () => clearInterval(timer), { once: true });
+  void refresh();
 }

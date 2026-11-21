@@ -1,3 +1,4 @@
+import { useLanguage } from '../i18n/LanguageSelect';
 import { useEffect, useRef, useState } from 'react';
 import type { Point, TagSurface } from '../ar/station';
 import { TagMarkers } from './TagMarkers';
@@ -7,6 +8,7 @@ export type PlottedTag = { index: number; id: string; center: Point; yaw: number
 export function StationPlan({ passages, outline, route, tags, selected, select }: {
   passages: Point[][]; outline: Point[]; route: Point[]; tags: PlottedTag[]; selected: number | null; select: (index: number) => void;
 }) {
+  const { t } = useLanguage();
   const frame = useRef<HTMLDivElement>(null);
   const surface = useRef<HTMLCanvasElement>(null);
   const [[width, height], setSize] = useState([0, 0]);
@@ -104,8 +106,8 @@ export function StationPlan({ passages, outline, route, tags, selected, select }
   }, [width, height, scale, originX, originY, outline, route, passages]);
 
   return <div className="plan-stage" ref={frame}>
-    <canvas ref={surface} role="img" aria-label="지형 경계와 안내 경로가 표시된 평면 배치도" />
-    <div className="plan-axes" aria-label="오른쪽이 양의 X, 위쪽이 양의 Y">
+    <canvas ref={surface} role="img" aria-label={t('지형 경계와 안내 경로가 표시된 평면 배치도')} />
+    <div className="plan-axes" aria-label={t('오른쪽이 양의 X, 위쪽이 양의 Y')}>
       <span>+Y</span><span className="plan-axis-lines" /><span>+X</span>
     </div>
     {width > 0 && <>
@@ -114,7 +116,7 @@ export function StationPlan({ passages, outline, route, tags, selected, select }
         width={width} height={height} selected={selected} select={select}
         reserved={endpoints.map(([[x, y]]) => ({ x: originX + x * scale + 11, y: originY - y * scale + 9, w: 24, h: 16 }))} />
       {endpoints.map(([[x, y], label]) => <span className="plan-endpoint" key={label}
-        style={{ left: originX + x * scale, top: originY - y * scale }}>{label}</span>)}
+        style={{ left: originX + x * scale, top: originY - y * scale }}>{t(label)}</span>)}
       {Number.isFinite(scaleUnit) && <div className="plan-scale" style={{ width: scale * scaleUnit }}>{scaleUnit} m</div>}
     </>}
   </div>;

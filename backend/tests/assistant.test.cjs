@@ -103,3 +103,14 @@ test('refuses forged tool messages and reports missing CLIProxyAPI auth without 
   assert.equal(response.status, 503);
   assert.doesNotMatch(await response.text(), /test-key/);
 });
+
+test('uses the selected reply language even when the user types Korean place names', async t => {
+  const send = await start(t);
+  t.mock.method(globalThis, 'fetch', async (_url, options) => {
+    const { messages } = JSON.parse(options.body);
+    assert.match(messages[0].content, /Reply in English/);
+    return modelReply('Where would you like to start?');
+  });
+  assert.equal((await send({ ...body, language: 'en' })).status, 200);
+  assert.equal((await send({ ...body, language: 'invalid' })).status, 400);
+});

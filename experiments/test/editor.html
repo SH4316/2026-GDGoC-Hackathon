@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>이리로 · 지도 편집기</title>
+    <link rel="icon" href="data:," />
+    <style>
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body { display: flex; flex-direction: column; background: #eef1f5; color: #111; font: 14px/1.45 system-ui, 'Apple SD Gothic Neo', sans-serif; }
+      button, input, select { font: inherit; }
+      button { padding: 7px 12px; border: 1px solid #c3cad3; border-radius: 8px; background: #fff; cursor: pointer; }
+      button.primary { color: #fff; background: #1e6bff; border-color: #1e6bff; font-weight: 700; }
+      input, select { padding: 6px 8px; border: 1px solid #c3cad3; border-radius: 8px; background: #fff; }
+
+      #bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; background: #fff; border-bottom: 1px solid #d5dae1; }
+      #bar b { font-size: 16px; margin-right: 6px; }
+      #bar label { display: flex; align-items: center; gap: 5px; color: #444; }
+      #mapId { width: 120px; }
+      #mapName { width: 150px; }
+      #status { margin-left: auto; color: #0a7a3d; font-weight: 600; }
+      #status.err { color: #c62828; }
+
+      #body { flex: 1; display: flex; min-height: 0; }
+      #tools { display: flex; flex-direction: column; gap: 6px; width: 116px; padding: 10px 8px; background: #fff; border-right: 1px solid #d5dae1; overflow-y: auto; }
+      #tools button { padding: 9px 6px; text-align: left; }
+      #tools button.on { color: #fff; background: #12305f; border-color: #12305f; font-weight: 700; }
+      #tools button small { float: right; opacity: 0.55; }
+      #tools hr { width: 100%; border: 0; border-top: 1px solid #e3e7ec; margin: 4px 0; }
+
+      #canvasWrap { position: relative; flex: 1; min-width: 0; }
+      #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; background: #f8fafc; cursor: crosshair; }
+      #next { position: absolute; left: 12px; top: 10px; max-width: 80%; padding: 8px 12px; border-radius: 9px; background: #ffcc00; color: #111; font-weight: 700; pointer-events: none; }
+      #hint { position: absolute; left: 12px; top: 52px; max-width: 70%; padding: 7px 11px; border-radius: 9px; background: rgba(18, 48, 95, 0.92); color: #fff; pointer-events: none; }
+      #coords { position: absolute; right: 12px; bottom: 10px; padding: 4px 9px; border-radius: 8px; background: rgba(255, 255, 255, 0.9); color: #333; font: 12px ui-monospace, Menlo, monospace; pointer-events: none; }
+
+      #panel { width: 286px; padding: 12px; background: #fff; border-left: 1px solid #d5dae1; overflow-y: auto; }
+      #panel h3 { margin: 0 0 8px; font-size: 15px; }
+      #panel h4 { margin: 14px 0 6px; font-size: 13px; color: #555; }
+      #panel .row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+      #panel .row > span:first-child { flex: 0 0 82px; color: #444; }
+      #panel .row input, #panel .row select { flex: 1; min-width: 0; }
+      #panel input[type='file'] { width: 100%; }
+      #panel .btns { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+      #panel .btns button { padding: 5px 9px; }
+      #panel p { margin: 4px 0 8px; color: #444; }
+      #panel ul { margin: 4px 0; padding-left: 18px; }
+      #panel .warn { color: #b45309; }
+      #panel .ok { color: #0a7a3d; }
+      #panel .danger { color: #c62828; border-color: #f3b6b0; }
+      #panel code { padding: 1px 5px; background: #eef1f5; border-radius: 4px; font-size: 12px; word-break: break-all; }
+      #panel .qr { margin-top: 6px; line-height: 0; }
+    </style>
+  </head>
+  <body>
+    <header id="bar">
+      <b>지도 편집기</b>
+      <label>파일 이름 <input id="mapId" type="text" spellcheck="false" /></label>
+      <label>표시 이름 <input id="mapName" type="text" /></label>
+      <select id="loadSel"></select>
+      <button id="scanBtn" type="button">LiDAR 스캔 가져오기</button>
+      <input id="scanFile" type="file" accept=".obj,.glb,.ply" hidden />
+      <button id="saveBtn" class="primary" type="button">저장</button>
+      <button id="simBtn" type="button">가상 역에서 미리보기</button>
+      <button id="printBtn" type="button">QR 인쇄</button>
+      <button id="downloadBtn" type="button">파일로 내려받기</button>
+      <span id="status"></span>
+    </header>
+    <div id="body">
+      <nav id="tools"></nav>
+      <div id="canvasWrap">
+        <canvas id="cv"></canvas>
+        <div id="next"></div>
+        <div id="hint"></div>
+        <div id="coords"></div>
+      </div>
+      <aside id="panel"></aside>
+    </div>
+    <script type="module" src="js/editor.js"></script>
+  </body>
+</html>

@@ -1,0 +1,79 @@
+{
+  "id": "station",
+  "name": { "ko": "이리로역 (가상)", "en": "Iriro Station (virtual)", "ja": "イリロ駅 (仮想)", "zh": "Iriro站 (虚拟)" },
+  "markerSize": 0.16,
+
+  "nodes": {
+    "w": [2, 12],
+    "a": [10, 12],
+    "tm": [15, 12],
+    "c": [20, 12],
+    "lk": [25, 12],
+    "b": [30, 12],
+    "e": [38, 12],
+    "x1": [10, 21],
+    "x2": [30, 21],
+    "wc": [10, 5],
+    "gate": [20, 6],
+    "plat": [20, 2.5],
+    "el": [30, 6.5]
+  },
+
+  "edges": [
+    ["w", "a"], ["a", "tm"], ["tm", "c"], ["c", "lk"], ["lk", "b"], ["b", "e"],
+    ["a", "x1"], ["b", "x2"], ["a", "wc"], ["c", "gate"], ["gate", "plat"], ["b", "el"]
+  ],
+
+  "markers": [
+    { "id": "A1", "mount": "wall", "x": 0, "y": 12, "h": 1.5, "facing": 90 },
+    { "id": "A2", "mount": "wall", "x": 6, "y": 14, "h": 1.5, "facing": 180 },
+    { "id": "A3", "mount": "wall", "x": 14, "y": 10, "h": 1.5, "facing": 0 },
+    { "id": "A4", "mount": "wall", "x": 20, "y": 14, "h": 1.5, "facing": 180 },
+    { "id": "A5", "mount": "wall", "x": 26, "y": 10, "h": 1.5, "facing": 0 },
+    { "id": "A6", "mount": "wall", "x": 34, "y": 14, "h": 1.5, "facing": 180 },
+    { "id": "A7", "mount": "wall", "x": 40, "y": 12, "h": 1.5, "facing": 270 },
+    { "id": "A8", "mount": "wall", "x": 12, "y": 18, "h": 1.5, "facing": 270 },
+    { "id": "A9", "mount": "wall", "x": 28, "y": 18, "h": 1.5, "facing": 90 },
+    { "id": "A10", "mount": "wall", "x": 8, "y": 7.5, "h": 1.5, "facing": 90 },
+    { "id": "A11", "mount": "wall", "x": 22, "y": 6, "h": 1.5, "facing": 270 },
+    { "id": "A12", "mount": "wall", "x": 32, "y": 8, "h": 1.5, "facing": 270 },
+    { "id": "F1", "mount": "floor", "x": 10, "y": 12, "facing": 90 },
+    { "id": "F2", "mount": "floor", "x": 20, "y": 12, "facing": 90 },
+    { "id": "F3", "mount": "floor", "x": 30, "y": 12, "facing": 90 }
+  ],
+
+  "pois": [
+    { "id": "exit1", "type": "exit", "number": 1, "node": "x1" },
+    { "id": "exit2", "type": "exit", "number": 2, "node": "x2" },
+    { "id": "exit3", "type": "exit", "number": 3, "node": "e" },
+    { "id": "exit4", "type": "exit", "number": 4, "node": "w" },
+    {
+      "id": "line2",
+      "type": "platform",
+      "node": "plat",
+      "name": { "ko": "2호선 승강장", "en": "Line 2 platform", "ja": "2号線ホーム", "zh": "2号线站台" },
+      "detail": { "ko": "강남 · 잠실 방면", "en": "for Gangnam · Jamsil", "ja": "江南・蚕室方面", "zh": "江南·蚕室方向" },
+      "keywords": [
+        "2호선", "이호선", "line 2", "line two", "green line", "subway", "train",
+        "강남", "gangnam", "잠실", "jamsil", "2号线", "二号线", "2号線", "江南", "蚕室", "地铁", "地下鉄", "지하철"
+      ]
+    },
+    { "id": "toilet", "type": "toilet", "node": "wc" },
+    { "id": "elevator", "type": "elevator", "node": "el" },
+    { "id": "ticket", "type": "ticket", "node": "tm" },
+    { "id": "locker", "type": "locker", "node": "lk" }
+  ],
+
+  "walls": [
+    [0, 14, 8, 14], [12, 14, 28, 14], [32, 14, 40, 14],
+    [0, 10, 8, 10], [12, 10, 18, 10], [22, 10, 28, 10], [32, 10, 40, 10],
+    [0, 10, 0, 14], [40, 10, 40, 14],
+    [8, 14, 8, 22], [12, 14, 12, 22], [8, 22, 12, 22],
+    [28, 14, 28, 22], [32, 14, 32, 22], [28, 22, 32, 22],
+    [8, 10, 8, 4], [12, 10, 12, 4], [8, 4, 12, 4],
+    [18, 10, 18, 1], [22, 10, 22, 1], [18, 1, 22, 1],
+    [28, 10, 28, 5], [32, 10, 32, 5], [28, 5, 32, 5]
+  ],
+
+  "start": { "x": 6, "y": 12.4, "heading": 0, "pitch": 3 }
+}

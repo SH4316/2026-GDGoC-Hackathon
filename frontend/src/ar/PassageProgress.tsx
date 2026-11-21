@@ -1,3 +1,4 @@
+import { useLanguage } from '../i18n/LanguageSelect';
 import { useMemo } from 'react';
 import type { MinimapPose } from './indoorTracking';
 import { distanceAlong, measurePassage, passageMeters, type PassageRoute } from './passageRoute';
@@ -12,14 +13,15 @@ export function PassageBar({ route, distance }: { route: PassageRoute; distance:
 }
 
 export function LivePassageProgress({ layout, points, pose }: { layout?: SpaceLayout; points?: Point[]; pose?: MinimapPose }) {
+  const { t, locale } = useLanguage();
   const route = useMemo(() => layout && measurePassage(points ?? layout.station.route), [layout, points]);
   if (!route || !pose || pose.spaceId !== layout?.id || pose.source === 'last') return null;
   const along = distanceAlong(route, pose.point);
   if (along === undefined) return null;
   return <div className="live-passage-progress">
     <div className="live-passage-reading">
-      <span>{pose.source === 'motion' ? '추정 위치 기준' : '태그 위치 기준'}</span>
-      <strong>약 {passageMeters(route.length - along)} 남음</strong>
+      <span>{pose.source === 'motion' ? t('추정 위치 기준') : t('태그 위치 기준')}</span>
+      <strong>{t('약 {distance} 남음', { distance: passageMeters(route.length - along, locale) })}</strong>
     </div>
     <PassageBar route={route} distance={along} />
   </div>;

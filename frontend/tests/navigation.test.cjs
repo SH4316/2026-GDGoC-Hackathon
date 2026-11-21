@@ -121,6 +121,55 @@ test('older TMAP responses can identify a registered directed transfer from conn
   } }]), [corridor]), []);
 });
 
+test('journey AR accepts a registered transfer in the planned direction until boarding', async () => {
+  const { orientTransferLayout, progressAtIndoorArrival, progressAtTag, upcomingIndoorTransfer } = await import('../src/navigation/stationProgress.ts');
+  const rail = (name, stops) => ({ kind: '지하철', rail: { lines: [name], stops: stops.map(name => ({ name })) }, points: [] });
+  const transferWalk = { kind: '도보', points: [] };
+  const trip = { mode: 'transit', destination: end, steps: [
+    rail('4호선', ['정왕', '초지']), transferWalk, rail('서해선', ['초지', '소사']),
+  ] };
+  const reverseTrip = { ...trip, steps: [
+    rail('서해선', ['소사', '초지']), transferWalk, rail('4호선', ['초지', '정왕']),
+  ] };
+  const station = { tags: [{ id: 4, center: [0, 0] }, { id: 5, center: [10, 0] }], route: [[0, 0], [10, 0]],
+    stationLinks: [{ name: '초지', line: '4호선', routeEndpoint: 'start' }, { name: '초지', line: '서해선', routeEndpoint: 'end' }] };
+  assert.equal(upcomingIndoorTransfer(trip, { step: 0 }, station).boardingStep, 2);
+  assert.equal(upcomingIndoorTransfer(trip, { step: 1 }, station).boardingStep, 2);
+  const { readProgress } = require('../src/navigation/journeyUrl.ts');
+  const restored = query => readProgress(new URLSearchParams(query), trip.steps.length);
+  const gpsBoarding = restored('view=map&step=2');
+  assert.equal(upcomingIndoorTransfer(trip, gpsBoarding, station)?.boardingStep, 2);
+  const entrance = progressAtTag(trip, gpsBoarding, station, 4, 100);
+  assert.deepEqual([entrance.step, entrance.station, entrance.stopIndex], [2, '초지', -1]);
+  assert.equal(progressAtIndoorArrival(trip, entrance, { id: 'transfer', station }, 101).stopIndex, 0);
+  const platform = restored('view=transfer&step=2&station=초지&stop=0&tagTime=101');
+  assert.equal(upcomingIndoorTransfer(trip, platform, station, true)?.boardingStep, 2);
+  assert.equal(upcomingIndoorTransfer(trip, { ...platform, station: '다른 역' }, station, true), undefined);
+  for (const current of [platform, { step: 2, stopIndex: 1, station: '소사' }, { step: 3 }]) {
+    assert.equal(upcomingIndoorTransfer(trip, current, station), undefined);
+    assert.equal(progressAtIndoorArrival(trip, current, { id: 'transfer', station }, 102), current);
+  }
+  const confirmed = progressAtTag(reverseTrip, { step: 0 }, station, 5, 100);
+  assert.equal(confirmed.station, '초지');
+  assert.equal(confirmed.step, 1);
+  assert.equal(upcomingIndoorTransfer(reverseTrip, confirmed, station), undefined);
+  const reverse = { ...station, stationLinks: station.stationLinks.map(link => ({
+    ...link, routeEndpoint: link.routeEndpoint === 'start' ? 'end' : 'start',
+  })) };
+  assert.equal(upcomingIndoorTransfer(reverseTrip, confirmed, reverse).boardingStep, 2);
+  const { trackingLayout, routeTree } = require('../src/ar/tagRouting.ts');
+  const automatic = trackingLayout({ id: 'tags', station: { ...station, route: [], autoRoute: { startTag: 4, endTag: 5 } } });
+  const back = orientTransferLayout(reverseTrip, automatic, 0);
+  assert.deepEqual(back.station.autoRoute, { startTag: 5, endTag: 4 });
+  assert.equal(back.station.stationLinks.find(link => link.routeEndpoint === 'end').line, '4호선');
+  assert.deepEqual(back.station.route, [[10, 0], [0, 0]]);
+  assert.equal(routeTree(back.network).goal, back.network.anchors[4]);
+  assert.equal(progressAtIndoorArrival(reverseTrip, { step: 1 }, back, 100).step, 2);
+  assert.equal(orientTransferLayout(trip, automatic, 0), automatic);
+  assert.equal(upcomingIndoorTransfer(trip, { step: 0 }, { ...station, stationLinks: [] }), undefined);
+  assert.equal(upcomingIndoorTransfer({ ...trip, destination: { ...end, name: '초지역' } }, { step: 0 }, station), undefined);
+});
+
 test('a station destination can be reached on foot and ambiguous spaces need an identified endpoint', async () => {
   const { readRoute } = await import('../src/navigation/routes.ts');
   const { progressAtTag } = await import('../src/navigation/stationProgress.ts');

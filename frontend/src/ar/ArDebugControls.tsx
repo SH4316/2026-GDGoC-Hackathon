@@ -1,3 +1,5 @@
+import { uploadNotice } from '../i18n/language';
+import { useLanguage } from '../i18n/LanguageSelect';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { DebugSession } from './debugSession';
 import { DebugUploads, debugCsvUrl, type UploadView } from './debugUploads';
@@ -63,6 +65,7 @@ function axes(values: readonly number[]) {
 }
 
 function LiveReadings({ session }: { session: DebugSession }) {
+  const { t, locale } = useLanguage();
   const [, refresh] = useState(0);
   useEffect(() => {
     const timer = window.setInterval(() => refresh(n => n + 1), 250);
@@ -74,15 +77,16 @@ function LiveReadings({ session }: { session: DebugSession }) {
     : session.access === 'unavailable' ? '이 기기에서 가속도를 지원하지 않습니다.'
     : session.access === 'prompt' ? '동작 센서 권한 확인 중' : '센서 수신 대기';
   return <dl className="debug-readings">
-    <dt>가속도 · {session.motionCount.toLocaleString()}건</dt>
-    <dd>{acceleration ? axes(acceleration) + ' m/s²' + (lastMotion?.acceleration ? '' : ' (중력 포함)') : sensorStatus}</dd>
-    <dt>최근 실내 위치 · {session.positionCount.toLocaleString()}건</dt>
-    <dd>{lastPosition ? sourceLabel[lastPosition.source] + ' · ' + axes(lastPosition.point) + ' m'
-      : '등록된 태그를 비추면 위치가 기록됩니다.'}</dd>
+    <dt>{t('가속도 · {count}건', { count: session.motionCount.toLocaleString(locale) })}</dt>
+    <dd>{acceleration ? axes(acceleration) + ' m/s²' + (lastMotion?.acceleration ? '' : ' (' + t('중력 포함') + ')') : t(sensorStatus)}</dd>
+    <dt>{t('최근 실내 위치 · {count}건', { count: session.positionCount.toLocaleString(locale) })}</dt>
+    <dd>{lastPosition ? t(sourceLabel[lastPosition.source]) + ' · ' + axes(lastPosition.point) + ' m'
+      : t('등록된 태그를 비추면 위치가 기록됩니다.')}</dd>
   </dl>;
 }
 
 export function ArDebugControls({ debug, ready }: { debug: ReturnType<typeof useArDebug>; ready: boolean }) {
+  const { t, locale } = useLanguage();
   const { session, files, empty, upload } = debug;
   const logs = new Map(upload.logs.map(log => [log.id, log]));
   const local = new Map(files.map(file => [file.id, file]));
@@ -94,22 +98,22 @@ export function ArDebugControls({ debug, ready }: { debug: ReturnType<typeof use
   return <>
     <button type="button" className="settings-trigger debug-trigger" aria-pressed={!!session}
       disabled={!session && !ready} onClick={session ? debug.stop : debug.start}>
-      {session ? '디버그 수집 종료' : '디버그 활성화'}
+      {session ? t('디버그 수집 종료') : t('디버그 활성화')}
     </button>
-    {(session || history.length > 0 || empty) && <section className="debug-panel" aria-label="AR 디버그 데이터">
+    {(session || history.length > 0 || empty) && <section className="debug-panel" aria-label={t('AR 디버그 데이터')}>
       {session && <>
         <LiveReadings session={session} />
-        <p>서버 저장 {(logs.get(session.id)?.sent ?? 0).toLocaleString()}건</p>
+        <p>{t('서버 저장 {count}건', { count: (logs.get(session.id)?.sent ?? 0).toLocaleString(locale) })}</p>
       </>}
-      {upload.notice && <p role="status">{upload.notice}</p>}
-      {empty && <p role="status">수집된 값이 없습니다. 동작 센서 권한과 태그 인식을 확인하세요.</p>}
+      {upload.notice && <p role="status">{uploadNotice(upload.notice, t)}</p>}
+      {empty && <p role="status">{t('수집된 값이 없습니다. 동작 센서 권한과 태그 인식을 확인하세요.')}</p>}
       {history.length > 0 && <details open={!session && files.length > 0} key={session ? 'active' : 'stopped'}>
-        <summary>수집 파일 {history.length}개</summary>
+        <summary>{t('수집 파일 {count}개', { count: history.length })}</summary>
         {history.map(({ id, file, sent, total, startedAtMs }) => <div key={id}>
-          <p>{new Date(startedAtMs).toLocaleString('ko-KR')} · {sent === total
-            ? '서버 저장 완료 ' + total.toLocaleString() + '건' : '서버 저장 ' + sent.toLocaleString() + ' / ' + total.toLocaleString() + '건'}</p>
-          {sent === total && <a href={debugCsvUrl(id)} download>서버 CSV 받기</a>}
-          {file && <a href={file.url} download={file.name}>기기 CSV 받기</a>}
+          <p>{new Date(startedAtMs).toLocaleString(locale)} · {sent === total
+            ? t('서버 저장 완료 {count}건', { count: total.toLocaleString(locale) }) : t('서버 저장 {count}건', { count: sent.toLocaleString(locale) + ' / ' + total.toLocaleString(locale) })}</p>
+          {sent === total && <a href={debugCsvUrl(id)} download>{t('서버 CSV 받기')}</a>}
+          {file && <a href={file.url} download={file.name}>{t('기기 CSV 받기')}</a>}
         </div>)}
       </details>}
     </section>}

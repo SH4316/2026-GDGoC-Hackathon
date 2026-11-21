@@ -48,3 +48,19 @@
   color: #def5e8;
   filter: drop-shadow(0 1px 2px #173626);
 }
+.indoor-instruction {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.passage-reorient {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  box-sizing: border-box;
+  padding: 5px;
+  border: 1px solid #a6edc7;
+  border-radius: 50%;
+  background: #173626;
+  color: #def5e8;
+}

@@ -9,6 +9,7 @@
 .tag-print-actions { flex: none; display: flex; align-items: center; gap: 8px; }
 .tag-print-actions a:hover { background: #eef6f2; border-color: #9bb9ad; }
 @media screen and (max-width: 560px) {
+  .tag-print-actions { max-width: 100%; flex-wrap: wrap; }
   .tag-print-tools { align-items: flex-start; flex-direction: column; }
 }
 .tag-sheet {

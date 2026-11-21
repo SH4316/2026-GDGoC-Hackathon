@@ -8,6 +8,37 @@ import { modelFile, stationSchema, type Station } from './schema.js';
 
 export const MAX_MODEL_BYTES = 32 * 1024 * 1024;
 const digest = (data: Buffer | string) => createHash('sha256').update(data).digest('hex');
+const serializeStation = (station: Station) => JSON.stringify(station, null, 2) + '\n';
+
+function withRoutingEndpoints(station: Station): Station {
+  if (station.tagGraph || station.autoRoute === false || station.tags.length < 2) return station;
+  const { route, tags } = station;
+  if (station.autoRoute || !route.length) {
+    const settings = station.autoRoute;
+    const startTag = settings?.startTag ?? tags.find(t => t.id !== settings?.endTag)!.id;
+    const endTag = settings?.endTag ?? tags.find(t => t.id !== startTag)!.id;
+    return { ...station, autoRoute: { startTag, endTag } };
+  }
+  // Older tag-based layouts stored copies of tag coordinates in the route.
+  // Bind those endpoints to IDs before an edit moves one of the markers.
+  const at = new Map<string, number | undefined>();
+  for (const tag of tags) {
+    const key = (tag.walkPoint ?? tag.center).join(',');
+    at.set(key, at.has(key) ? undefined : tag.id);
+  }
+  const ids = route.map(point => at.get(point.join(',')));
+  const startTag = ids[0], endTag = ids.at(-1);
+  if (startTag !== undefined && endTag !== undefined && startTag !== endTag &&
+      ids.every(id => id !== undefined) && new Set(ids).size === ids.length)
+    return { ...station, autoRoute: { startTag, endTag } };
+  return station;
+}
+
+function stationDocument(input: unknown) {
+  const station = withRoutingEndpoints(stationSchema.parse(input));
+  // Use the saved file format so unchanged layouts keep their version across the correction.
+  return { station, etag: '"' + digest(serializeStation(station)) + '"' };
+}
 
 function exampleCorridor() {
   const vertices = [0, 0.65].flatMap(height =>
@@ -107,7 +138,8 @@ export class StationStore {
   }
 
   private checkSpace(station: Station, spaceId?: string) {
-    if (!station.tagGraph && !station.route.length && station.stationLinks?.some(stop => stop.routeEndpoint))
+    if (!station.tagGraph && !station.route.length && !(station.autoRoute && station.tags.length >= 2) &&
+        station.stationLinks?.some(stop => stop.routeEndpoint))
       throw new BadRequestException('연결 역에 출발점이나 도착점을 지정하려면 안내 경로를 입력하세요.');
     const tagIds = new Set(station.tags.map(tag => tag.id));
     for (const { id, station: other } of this.listLayouts()) {
@@ -131,14 +163,13 @@ export class StationStore {
   read(id = 'default') {
     const path = this.spacePath(id);
     if (!existsSync(path)) throw new NotFoundException('공간을 찾을 수 없습니다.');
-    const bytes = readFileSync(path);
-    return { station: stationSchema.parse(JSON.parse(bytes.toString('utf8'))), etag: '"' + digest(bytes) + '"' };
+    return stationDocument(JSON.parse(readFileSync(path, 'utf8')));
   }
 
   private write(station: Station, id = 'default') {
-    const bytes = JSON.stringify(station, null, 2) + '\n';
-    writeAtomic(this.spacePath(id), bytes);
-    return { station, etag: '"' + digest(bytes) + '"' };
+    const document = stationDocument(station);
+    writeAtomic(this.spacePath(id), serializeStation(document.station));
+    return document;
   }
 
   private validate(input: unknown) {
@@ -150,19 +181,24 @@ export class StationStore {
       if (entry?.model && !existsSync(join(this.models, entry.model.file)))
         throw new BadRequestException('업로드된 모델을 선택하세요.');
     }
-    return parsed.data;
+    return withRoutingEndpoints(parsed.data);
   }
 
   replace(input: unknown, expected?: string, id = 'default') {
     const current = this.read(id);
     if (expected && expected !== '*' && current.etag !== expected)
       throw new PreconditionFailedException('다른 기기에서 배치를 수정했습니다. 최신 배치를 불러와 다시 저장하세요.');
+    // Older clients may omit the settings while moving tags or adding one.
+    if (current.station.autoRoute !== undefined && input && typeof input === 'object' &&
+        !('autoRoute' in input) && !('tagGraph' in input && input.tagGraph))
+      input = { ...input, autoRoute: current.station.autoRoute };
     let station = this.validate(input);
-    if (current.station.tagGraph && input && typeof input === 'object' && !('tagGraph' in input)) {
+    if (current.station.tagGraph && input && typeof input === 'object' && !('tagGraph' in input) &&
+        !('autoRoute' in input && input.autoRoute)) {
       // An older editor does not send the graph or its floor offsets.
       const previous = new Map(current.station.tags.map(tag => [tag.id, tag.walkPoint]));
       const tags = station.tags.map(tag => ({ ...tag, walkPoint: tag.walkPoint ?? previous.get(tag.id) }));
-      station = this.validate({ ...station, tags, tagGraph: current.station.tagGraph });
+      station = this.validate({ ...station, tags, autoRoute: undefined, tagGraph: current.station.tagGraph });
     }
     const next = { ...station, terrain: station.terrain ?? current.station.terrain,
       stationLinks: station.stationLinks ?? current.station.stationLinks };

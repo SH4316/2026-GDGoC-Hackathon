@@ -1,6 +1,6 @@
 const { readFileSync } = require('node:fs');
-const { join } = require('node:path');
-const { runInNewContext } = require('node:vm');
+const { basename, join } = require('node:path');
+const { createContext, runInContext } = require('node:vm');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 
@@ -14,14 +14,20 @@ const W = 640, H = 800;
 
 function startWorker(cv, config) {
   let reply;
-  const self = { cv, postMessage(data) { reply = data; } };
-  runInNewContext(workerCode, { self, importScripts() {}, console });
-  const spaces = (config.spaces ?? [{ id: 'default', station: config.station }]).map(space => ({
+  const self = createContext({ cv, console, postMessage(data) { reply = data; } });
+  self.self = self;
+  self.importScripts = name => {
+    if (name) runInContext(readFileSync(join(root, 'ar', basename(name).split('?')[0]), 'utf8'), self);
+  };
+  runInContext(workerCode, self);
+  const withTrees = layouts => layouts.map(space => ({
     ...space, tree: routeTree(tagNetwork(space.station)),
   }));
+  const spaces = withTrees(config.spaces ?? [{ id: 'default', station: config.station }]);
   self.onmessage({ data: { type: 'init', library: '', spaces } });
   assert.equal(reply.type, 'ready', reply.message);
   return (rgba, selection) => {
+    if (selection?.layouts) self.onmessage({ data: { type: 'layouts', spaces: withTrees(selection.layouts) } });
     if (selection?.destination) self.onmessage({ data: { type: 'destination', ...selection.destination } });
     self.onmessage({ data: { type: 'frame', w: W, h: H, rgba: rgba.buffer, ...selection } });
     assert.equal(reply.type, 'frame');
@@ -60,10 +66,10 @@ function floorAt(eye, look, cal) {
   };
 }
 
-function scene(cv, floor, ids, textured = false, side = .16) {
+function scene(cv, floor, ids, textured = false, side = .16, placements = station.tags) {
   const dictionary = cv.getPredefinedDictionary(cv.DICT_APRILTAG_36h11);
   const markers = ids.map(([locationId, printedId]) => {
-    const tag = station.tags.find(t => t.id === locationId);
+    const tag = placements.find(t => t.id === locationId);
     const bitmap = new cv.Mat();
     cv.generateImageMarker(dictionary, printedId, 8, bitmap, 1);
     const bits = Uint8Array.from(bitmap.data);
@@ -126,7 +132,8 @@ test('floor localization, route turn, tag loss and reacquisition', async () => {
   const stripe = fix.guide.flat().filter(([u,v]) => u >= 0 && u < W && v >= 0 && v < H).map(p => floor(...p));
   assert.ok(stripe.some(([x,y]) => Math.abs(x - .045) < .025 && y > .1 && y < 1.8));
   assert.ok(stripe.some(([x,y]) => Math.abs(x + .045) < .025 && y > .1 && y < 1.8));
-  assert.equal(fix.maneuver.kind, 'straight');
+  assert.equal(fix.maneuver.kind, 'right');
+  assert.equal(fix.maneuver.stage, 'soon', 'the arrow follows the approach while speech previews the turn');
   const reversed = worker(cv, { ...station, route: [[0, 2], [0, -2]] })(straight);
   assert.equal(reversed.maneuver.kind, 'realign');
   assert.ok(fix.ids.length >= 2, 'multi-tag consensus');
@@ -172,6 +179,46 @@ test('floor localization, route turn, tag loss and reacquisition', async () => {
   checkFix(calibrated(scene(cv,calibratedFloor,[[0,0],[1,1]])),eye,calibratedFloor,1,[cal.cx,cal.cy]);
 });
 
+test('two oblique floor tags support a joint pose only when every corner agrees', async () => {
+  const { cv } = await new Promise(resolve => require('@techstark/opencv-js').then(cv => resolve({ cv })));
+  const eye = [0, 1.47, 1.1], floor = floorAt(eye, [0, .87, 0]);
+  const pixels = scene(cv, floor, [[0, 4], [1, 5]]);
+  const track = startWorker(cv, { station: corridor });
+  const frame = track(pixels);
+  assert.deepEqual(Array.from(frame.detections, tag => tag.id).sort(), [4, 5]);
+  assert.ok(frame.fix, 'both decoded tags agree on a pose');
+  assert.deepEqual(Array.from(frame.fix.ids).sort(), [4, 5]);
+  assert.ok(frame.fix.rmsPx < 1);
+  assert.ok(Math.hypot(...frame.fix.position.map((value, i) => value - eye[i])) < .02);
+
+  // A 5 cm survey error leaves the mean below 2.5 px but one corner over 3 px.
+  const shifted = { ...corridor, tags: corridor.tags.map(tag => tag.id === 4
+    ? { ...tag, center: [tag.center[0] + .05, tag.center[1]] } : tag) };
+  assert.equal(startWorker(cv, { station: shifted })(pixels).fix, null);
+});
+
+test('the displayed stripe follows the measured radial distortion of a calibrated lens', async () => {
+  const { cv } = await new Promise(resolve => require('@techstark/opencv-js').then(cv => resolve({ cv })));
+  const cal = { width: W, height: H, fx: 650, fy: 685, cx: W/2+9, cy: H/2-7, distortion: [.22,0,0,0] };
+  const eye = [0, -.45, 1.15], pinhole = floorAt(eye, [0,.62,0], cal);
+  function floor(u, v) {
+    const dx = (u-cal.cx)/cal.fx, dy = (v-cal.cy)/cal.fy;
+    let x = dx, y = dy;
+    for (let i = 0; i < 8; i++) {
+      const radial = 1 + cal.distortion[0]*(x*x+y*y);
+      x = dx/radial; y = dy/radial;
+    }
+    return pinhole(cal.cx+x*cal.fx, cal.cy+y*cal.fy);
+  }
+  const track = startWorker(cv, { station: { ...station, camera: { calibration: cal } } });
+  const pixels = scene(cv, floor, [[0,0], [1,1], [2,2]]);
+  const { fix } = track(pixels, { frameTimeMs: 0 });
+  checkFix(fix, eye, floor, 1, [cal.cx, cal.cy]);
+  const tip = fix.guide.flat().filter(([u, v]) => u > 0 && u < W && v > 0 && v < H)
+    .map(p => floor(...p)).filter(([x]) => x > .6);
+  assert.ok(tip.length > 0 && tip.every(([, y]) => Math.abs(y-2) < .07), 'the outgoing leg stays on the surveyed bend');
+});
+
 test('monitor reflection preserves a decodable tag and drops a fully obscured tag', async () => {
   const { cv } = await new Promise(resolve => require('@techstark/opencv-js').then(cv => resolve({ cv })));
   const locate = worker(cv, station);
@@ -212,6 +259,162 @@ test('a wall-mounted tag localizes in the saved surface frame without a walking 
   assert.equal(fix.arrow, null);
   assert.equal(fix.guide.length, 0);
   assert.equal(fix.arrived, false);
+});
+
+function wallAt(height, wallY, pitch) {
+  const focal = Math.hypot(W, H) / (2 * Math.tan(35 * Math.PI / 180));
+  return (u, v) => {
+    const down = (v - (H - 1)/2) / focal;
+    const t = wallY / (Math.cos(pitch) - down * Math.sin(pitch));
+    return [t * (u - (W - 1)/2) / focal, height - t * (Math.sin(pitch) + down * Math.cos(pitch))];
+  };
+}
+
+test('a textured wall locates the camera and its active route without supporting floor pixels', async () => {
+  const { cv } = await new Promise(resolve => require('@techstark/opencv-js').then(cv => resolve({ cv })));
+  const height = 1.35, wallY = .9;
+  const onWall = wallAt(height, wallY, 20 * Math.PI / 180);
+  assert.ok(onWall(0, H-1)[1] > 0, 'even the bottom camera ray hits the vertical wall before the floor');
+  const id = 7, side = .24, wallLocation = [.16, 1.05];
+  const tag = { id, center: [wallLocation[0], wallY], yawDeg: 0, walkPoint: [0, wallY],
+    surface: { right: [1,0,0], up: [0,0,1], heightM: wallLocation[1] } };
+  const hall = { tagSideM: side, camera: station.camera, route: [[0, -.2], [0, 6]], tags: [tag] };
+  const track = startWorker(cv, { station: hall });
+  const wall = tagged => scene(cv, onWall, tagged ? [[id, id]] : [], true, side,
+    [{ id, center: wallLocation, yawDeg: 0 }]);
+  const sight = track(wall(true), { frameTimeMs: 0 });
+  assert.deepEqual(Array.from(sight.fix.ids), [id]);
+  assert.ok(Math.hypot(sight.fix.position[0], sight.fix.position[1], sight.fix.position[2] - height) < .08);
+  assert.deepEqual(Array.from(sight.route.at(-1)), hall.route.at(-1));
+  assert.equal(sight.fix.arrived, false);
+  assert.equal(sight.fix.routeBearing.direction, 'forward');
+  assert.equal(sight.fix.floorVisible, false);
+  assert.equal(sight.fix.arrow, null);
+  assert.equal(sight.fix.guide.length, 0);
+  const hidden = track(wall(false), { frameTimeMs: 120, knownRoute: sight.routeRevision,
+    floorAnchor: { spaceId: 'default', timeMs: 0 },
+    guideCamera: { spaceId: 'default', referenceTimeMs: 0, cameraToWorld: sight.fix.cameraToWorld } });
+  assert.equal(hidden.fix, null);
+  assert.equal(hidden.floorMotion, undefined, 'wall texture cannot establish a floor track');
+  assert.equal(hidden.motionGuide.screenDirection, 'forward');
+  assert.equal(hidden.motionGuide.arrow, null);
+  assert.equal(hidden.motionGuide.guide.length, 0);
+});
+
+// Count camera pixels inside the emitted polygons, including a face that crosses the sample
+// area with every vertex outside of it.
+function inkIn(view, left, top, right, bottom) {
+  const faces = view.arrow ? [...view.guide, view.arrow] : view.guide;
+  function contains(face, x, y) {
+    let inside = false;
+    for (let i = 0, j = face.length - 1; i < face.length; j = i++) {
+      const [ax, ay] = face[i], [bx, by] = face[j];
+      if ((ay > y) !== (by > y) && x < (bx - ax) * (y - ay) / (by - ay) + ax) inside = !inside;
+    }
+    return inside;
+  }
+  let covered = 0;
+  for (let y = top; y < bottom; y += 3) for (let x = left; x < right; x += 3) {
+    if (faces.some(face => contains(face, x, y))) covered++;
+  }
+  return covered;
+}
+
+test('a wall-tag pose retains independently tracked floor when both surfaces occupy the camera', async () => {
+  const { cv } = await new Promise(resolve => require('@techstark/opencv-js').then(cv => resolve({ cv })));
+  const height = 1.25, wallY = 2.2, pitch = 35 * Math.PI / 180, side = .24;
+  const onFloor = floorAt([0, 0, height], [0, 1, height - Math.tan(pitch)]);
+  const onWall = wallAt(height, wallY, pitch);
+  let firstFloorRow = 0;
+  while (firstFloorRow < H && onWall(0, firstFloorRow)[1] > 0) firstFloorRow++;
+  const floorTag = { id: 4, center: [-.26, 1.1], yawDeg: 0 };
+  const wallTag = { id: 7, center: [.34, wallY], yawDeg: 0,
+    surface: { right: [1,0,0], up: [0,0,1], heightM: .5 } };
+  const hall = { tagSideM: side, camera: station.camera, route: [[0, -2], [0, 6]], tags: [floorTag, wallTag] };
+  function frame(floorTagVisible, wallTagVisible) {
+    const image = scene(cv, onFloor, floorTagVisible ? [[4,4]] : [], true, side, [floorTag]);
+    const wall = scene(cv, onWall, wallTagVisible ? [[7,7]] : [], true, side,
+      [{ id: 7, center: [wallTag.center[0], wallTag.surface.heightM], yawDeg: 0 }]);
+    for (let y = 0; y < firstFloorRow; y++) {
+      for (let x = 0; x < W; x++) {
+        const i = 4 * (y * W + x), light = wall[i];
+        const tile = light !== 0 && light !== 255;
+        image[i] = light - (tile ? 32 : 0);
+        image[i+1] = light;
+        image[i+2] = light + (tile ? 24 : 0);
+      }
+    }
+    return image;
+  }
+  const track = startWorker(cv, { station: hall });
+  const anchor = track(frame(true, false), { frameTimeMs: 100 });
+  assert.deepEqual(Array.from(anchor.fix.ids), [4]);
+  assert.ok(anchor.fix.arrow && inkIn(anchor.fix, 285, 400, 355, 710) > 0);
+  const wallOnly = frame(false, true);
+  const sight = track(wallOnly, { frameTimeMs: 220, floorAnchor: { spaceId: 'default', timeMs: 100 } });
+  assert.deepEqual(Array.from(sight.fix.ids), [7]);
+  assert.equal(sight.fix.arrived, false);
+  assert.ok(sight.fix.floorVisible && inkIn(sight.fix, 285, 400, 355, 710) > 0,
+    'the previous tagged floor still matches on the lower part of the image');
+  assert.equal(inkIn(sight.fix, 0, 0, W, firstFloorRow), 0, 'no stripe or arrow appears on the wall above the floor');
+  const noTags = track(frame(false, false), { frameTimeMs: 340, floorAnchor: { spaceId: 'default', timeMs: 220 } });
+  assert.equal(noTags.fix, null);
+  assert.ok(noTags.floorMotion?.floorVisible, 'the mixed wall-and-floor frame supports the next optical observation');
+  const cold = startWorker(cv, { station: hall })(wallOnly, { frameTimeMs: 100 }).fix;
+  assert.equal(cold.routeBearing.direction, 'forward');
+  assert.equal(cold.floorVisible, false, 'the wall tag on its own cannot establish the floor material');
+});
+
+test('a person crossing the route masks its covered pixels through tag fixes and tagless optical tracking', async () => {
+  const { cv } = await new Promise(resolve => require('@techstark/opencv-js').then(cv => resolve({ cv })));
+  const track = startWorker(cv, { station });
+  const floor = floorAt([0, -.45, 1.15], [0, .62, 0]);
+  const clean = scene(cv, floor, [[0,0], [1,1]], true), tagless = scene(cv, floor, [], true);
+  function personOver(pixels) {
+    const result = pixels.slice();
+    for (let y = 323; y < 720; y++) for (let x = 245; x < 395; x++) {
+      const head = ((x - 320)/35)**2 + ((y - 370)/46)**2 < 1;
+      const jacket = y >= 405 && y < 605;
+      const leg = y >= 605 && (Math.abs(x - 285) < 21 || Math.abs(x - 355) < 21);
+      if (!head && !jacket && !leg) continue;
+      const i = 4 * (y * W + x);
+      const weave = ((x >> 3) ^ (y >> 3)) & 1 ? 24 : 0;
+      result[i] = head ? 166 : 52 + weave;
+      result[i+1] = head ? 110 : 33 + weave;
+      result[i+2] = head ? 88 : 77 + weave;
+    }
+    return result;
+  }
+  const jacketInk = view => inkIn(view, 247, 407, 393, 603);
+  const openFloorInk = view => inkIn(view, 290, 230, 350, 305);
+  const clear = track(clean, { frameTimeMs: 0 }).fix;
+  assert.ok(clear.arrow && jacketInk(clear) > 0 && openFloorInk(clear) > 0,
+    'the unobstructed stripe and arrow cover both sample areas');
+  function checkOcclusion(view) {
+    assert.ok(openFloorInk(view) > 0, 'the visible route above the person still has a stripe');
+    assert.equal(jacketInk(view), 0, 'the guide and arrow leave the opaque jacket clear');
+    assert.equal(inkIn(view, 301, 350, 339, 389), 0, 'the stripe does not cross the head above the jacket');
+    assert.equal(inkIn(view, 269, 615, 301, 713) + inkIn(view, 339, 615, 371, 713), 0,
+      'the arrow does not cross either leg below the jacket');
+  }
+  const taggedPerson = personOver(clean), taglessPerson = personOver(tagless);
+  for (const time of [120, 240, 360, 480]) {
+    const frame = track(taggedPerson, { frameTimeMs: time });
+    assert.ok(frame.fix.ids.includes(1), 'the floor tag beside the route remains readable');
+    checkOcclusion(frame.fix);
+  }
+  for (const time of [600, 720, 840, 960]) {
+    const frame = track(taglessPerson, { frameTimeMs: time, floorAnchor: { spaceId: 'default', timeMs: time - 120 } });
+    assert.equal(frame.fix, null);
+    assert.ok(frame.floorMotion, 'uncovered floor texture still provides a pose');
+    checkOcclusion(frame.floorMotion);
+  }
+  const clearAgain = track(clean, { frameTimeMs: 1080 }).fix;
+  assert.ok(clearAgain.arrow && jacketInk(clearAgain) > 0, 'the arrow returns when the person leaves');
+  const entering = track(taglessPerson, { frameTimeMs: 1200, floorAnchor: { spaceId: 'default', timeMs: 1080 } });
+  assert.equal(entering.fix, null);
+  assert.ok(entering.floorMotion, 'the person can enter on the first frame after the tags disappear');
+  checkOcclusion(entering.floorMotion);
 });
 
 test('tag IDs resolve the space and its local coordinates, including shared IDs and a pinned space', async () => {
@@ -337,6 +540,9 @@ test('floor matching bridges a brief occlusion, and a broken visual track needs 
   const matched = at(texture, 240, 0).floorMotion;
   assert.equal(matched.referenceTimeMs, 0);
   assert.ok(matched.guide.length > 0, 'a validated floor match reprojects the stripe without a tag');
+  assert.ok(matched.arrow?.length, 'the floor pose also projects a direction arrow without a tag');
+  assert.equal(matched.maneuver.stage, 'soon');
+  assert.equal(matched.arrived, undefined);
   assert.equal(at(texture, 360, 0).floorMotion, undefined, 'caller skipped the last observation');
   assert.equal(at(texture, 480, 240).floorMotion.referenceTimeMs, 240);
   for (let time = 600; time <= 2400; time += 120) assert.equal(at(blank, time, 480).floorMotion, undefined);
@@ -345,6 +551,101 @@ test('floor matching bridges a brief occlusion, and a broken visual track needs 
   assert.equal(at(texture, 3000, 2880).floorMotion.referenceTimeMs, 2880);
   const legacy = worker(texture, { frameTimeMs: 3120, motionCamera: { spaceId: 'default' } });
   assert.equal(legacy.floorMotion.referenceTimeMs, 3000);
+  assert.ok(at(texture, 3136, 3120).floorMotion?.floorVisible, 'without a gyro every submitted textured frame can refresh the floor');
+  assert.equal(at(blank, 3152, 3136).floorMotion, undefined);
+  assert.equal(at(blank, 3168, 3136).pendingFloorSpace, 'default', 'unmatched floor texture still backs off');
+});
+
+test('after a floor fix a full wall leaves only the rotating gyro bearing until floor evidence returns', async () => {
+  const { cv } = await new Promise(resolve => require('@techstark/opencv-js').then(cv => resolve({ cv })));
+  const hall = { ...station, tagSideM: .3, route: [[0,-2], [0,8]], tags: [{ id: 4, center: [0,1.6], yawDeg: 0 }] };
+  const worker = startWorker(cv, { station: hall }), eye = [0, 0, 1.3];
+  const floor = floorAt(eye, [0,2,0]);
+  const tag = scene(cv, floor, [[4,4]], true, .3, hall.tags);
+  const texture = scene(cv, floor, [], true);
+  const wall = new Uint8Array(W * H * 4);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = 4 * (y * W + x), course = Math.floor(y / 62);
+    const shade = y % 62 < 3 || (x + course * 54) % 108 < 3 ? 92 : 157;
+    wall[i] = shade; wall[i+1] = shade + 4; wall[i+2] = shade + 13; wall[i+3] = 255;
+  }
+  const sight = worker(tag, { frameTimeMs: 100 });
+  assert.ok(sight.fix?.arrow);
+  const knownRoute = sight.routeRevision;
+
+  function camera(yaw, pitch = 33, position = eye) {
+    const a = yaw * Math.PI/180, b = pitch * Math.PI/180;
+    const right = [Math.cos(a), -Math.sin(a), 0];
+    const lens = [Math.sin(a)*Math.cos(b), Math.cos(a)*Math.cos(b), -Math.sin(b)];
+    const down = cross(lens, right);
+    return { spaceId: 'default', referenceTimeMs: 100,
+      cameraToWorld: [...position.flatMap((p,i) => [right[i], down[i], lens[i], p]), 0, 0, 0, 1] };
+  }
+  function at(frameTimeMs, guideCamera, pixels = wall, options = {}) {
+    return worker(pixels, { frameTimeMs, knownRoute, guideCamera, recordingSpaceId: 'default', ...options });
+  }
+  function checkBearing(frame, degrees) {
+    assert.equal(frame.motionGuide.floorVisible, false);
+    assert.equal(frame.motionGuide.arrow, null);
+    assert.equal(frame.motionGuide.guide.length, 0);
+    assert.ok(Math.abs(frame.motionGuide.screenAngleDeg - degrees) < .001);
+  }
+  const first = at(145, camera(0), wall, { floorAnchor: { spaceId: 'default', timeMs: 100 } });
+  assert.equal(first.floorMotion, undefined);
+  assert.equal(first.pendingFloorSpace, undefined, 'the worker tried to confirm the floor on this frame');
+  checkBearing(first, 0);
+  const retry = at(170, camera(5), wall, { floorAnchor: { spaceId: 'default', timeMs: 100 } });
+  assert.equal(retry.pendingFloorSpace, 'default');
+  checkBearing(retry, -5);
+  const measured = at(260, camera(155), texture, { floorAnchor: { spaceId: 'default', timeMs: 100 } });
+  assert.ok(measured.floorMotion?.arrow);
+  assert.equal(measured.motionGuide, undefined);
+  const next = at(275, { ...camera(0), referenceTimeMs: 260 }, texture, { floorAnchor: { spaceId: 'default', timeMs: 260 } });
+  assert.ok(next.floorMotion?.floorVisible, 'supported floor remains drawable on the next submitted frame with the gyro enabled');
+  assert.equal(at(4000, camera(0)).motionGuide, undefined, 'a superseded visual reference cannot project');
+  const anchored = (yaw, pitch, position) => ({ ...camera(yaw, pitch, position), referenceTimeMs: 275 });
+  const small = at(4010, anchored(10));
+  checkBearing(small, -10);
+  const turned = at(12500, anchored(65));
+  assert.equal(turned.motionGuide.screenDirection, 'left');
+  checkBearing(turned, -65);
+  assert.equal(turned.fix, null);
+  assert.equal(turned.floorMotion, undefined);
+  assert.equal(turned.recording.fix, null);
+  const reverse = at(12600, anchored(180));
+  assert.equal(reverse.motionGuide.screenDirection, 'behind');
+  assert.equal(reverse.motionGuide.arrow, null);
+  const back = at(12700, anchored(0));
+  checkBearing(back, 0);
+  const raised = at(12710, anchored(0, -55));
+  assert.equal(raised.motionGuide.floorVisible, false);
+  assert.equal(raised.motionGuide.routeBearing.direction, 'forward');
+  const pitch = 40*Math.PI/180;
+  const gravity = [0, -Math.cos(pitch), Math.sin(pitch)];
+  const missedPitch = at(12720, anchored(0,0), wall, { floorUp: gravity });
+  assert.equal(missedPitch.motionGuide.floorVisible, false, 'fresh gravity does not turn the wall into floor evidence');
+  assert.equal(missedPitch.motionGuide.guide.length, 0);
+  assert.equal(missedPitch.motionGuide.arrow, null);
+  const distantTag = scene(cv, floorAt([0,0,4], [0,1.6,0]), [[4,4]], false, .3, hall.tags);
+  const partial = at(12760, anchored(65), distantTag);
+  assert.equal(partial.referenceTag.id, 4);
+  assert.equal(partial.fix, null);
+  assert.equal(partial.motionGuide.screenDirection, 'left', 'a same-space ID without a pose does not interrupt rotation');
+  const down = at(12800, anchored(65, 90), wall, { bounds: [100,100,101,101] });
+  assert.equal(down.motionGuide.screenDirection, 'left');
+  assert.ok(Math.abs(down.motionGuide.screenAngleDeg + 65) < .001);
+  const nearEnd = at(12900, anchored(0, 33, [0,7.9,1.3]));
+  assert.equal(nearEnd.fix, null);
+  assert.equal(nearEnd.motionGuide.arrow, null);
+  assert.equal(nearEnd.motionGuide.maneuver, undefined);
+  assert.equal(at(13000, { ...anchored(0), spaceId: 'other' }).motionGuide, undefined);
+  assert.equal(at(13100, anchored(0), wall, { knownRoute: knownRoute - 1 }).motionGuide, undefined);
+  const reacquired = at(13200, anchored(180), tag);
+  assert.ok(reacquired.fix?.arrow);
+  assert.equal(reacquired.motionGuide, undefined);
+  const tree = routeTree(tagNetwork(hall), 0);
+  assert.equal(at(13300, { ...camera(0), referenceTimeMs: 13200 }, wall,
+    { destination: { spaceId: 'default', tree } }).motionGuide, undefined);
 });
 
 test('a single implausible tag jump is held, a repeated relocation or a new sighting after a gap is accepted', async () => {
@@ -361,6 +662,49 @@ test('a single implausible tag jump is held, a repeated relocation or a new sigh
   assert.equal(at(away, 300).fix, null);
   assert.ok(at(away, 400).fix);
   assert.ok(at(center, 2000).fix);
+});
+
+test('the displayed stripe damps small oscillations, follows a pan and restarts on a fresh sighting', async () => {
+  const { cv } = await new Promise(resolve => require('@techstark/opencv-js').then(cv => resolve({ cv })));
+  const tag = { id: 104, center: [0, 1], yawDeg: 0 };
+  const map = { tags: [tag], tagSideM: .28, camera: { diagonalFovDeg: 70 }, route: [[0,-3], [0,10]] };
+  const track = startWorker(cv, { station: map }), single = startWorker(cv, { station: map });
+  const eye = [0, -.7, 1.25];
+  const image = x => scene(cv, floorAt(eye, [x, 1, 0]), [[tag.id, tag.id]], false, .28, [tag]);
+  const frames = [image(-.012), image(.012)];
+
+  function stripeX(fix) {
+    const row = H * .58, crossings = [];
+    for (const face of fix.guide) {
+      for (const [i, a] of face.entries()) {
+        const b = face[(i + 1) % face.length];
+        if ((a[1] < row) !== (b[1] < row))
+          crossings.push(a[0] + (b[0]-a[0]) * (row-a[1]) / (b[1]-a[1]));
+      }
+    }
+    assert.ok(crossings.length >= 2, 'the stripe crosses the camera scanline');
+    return (Math.min(...crossings) + Math.max(...crossings)) / 2;
+  }
+  const raw = frames.map(pixels => single(pixels).fix);
+  const rawSwing = Math.abs(stripeX(raw[0]) - stripeX(raw[1]));
+  assert.ok(rawSwing > 3);
+  const filtered = [];
+  for (let i = 0; i < 12; i++) {
+    const index = i % frames.length;
+    const result = track(frames[index], { frameTimeMs: i * 40, recordingSpaceId: 'default' });
+    assert.deepEqual(Array.from(result.recording.fix.cameraToWorld), Array.from(raw[index].cameraToWorld));
+    if (i >= 6) filtered.push(stripeX(result.fix));
+  }
+  assert.ok(Math.max(...filtered) - Math.min(...filtered) < rawSwing / 2);
+
+  const pan = image(.42), panned = stripeX(single(pan).fix);
+  assert.ok(Math.abs(panned - stripeX(raw[0])) > 80);
+  assert.ok(Math.abs(stripeX(track(pan, { frameTimeMs: 480 }).fix) - panned) < .01);
+  track(frames[0], { frameTimeMs: 520 });
+  const blank = track(scene(cv, floorAt(eye, [0, 1, 0]), []), { frameTimeMs: 560 });
+  assert.equal(blank.fix, null);
+  assert.equal(blank.floorMotion, undefined);
+  assert.ok(Math.abs(stripeX(track(frames[1], { frameTimeMs: 600 }).fix) - stripeX(raw[1])) < .01);
 });
 
 
@@ -403,6 +747,61 @@ test('a destination visible across a parallel aisle cannot complete a long conne
   assert.ok(fix.destinationDistance > 12);
 });
 
+test('a nearby localization-only tag keeps the route identified by a second visible tag', async () => {
+  const { cv } = await new Promise(resolve => require('@techstark/opencv-js').then(cv => resolve({ cv })));
+  const map = { ...station, route: [[-.25, -.45], [-.25, -3]] };
+  const network = tagNetwork(map);
+  assert.equal(network.anchors[0], 0);
+  assert.equal(network.anchors[1], undefined);
+  const track = startWorker(cv, { station: map });
+  const floor = floorAt([0, .7, 1.65], [0, .51, 0]);
+  const first = track(scene(cv, floor, [[0, 0]]));
+  const both = track(scene(cv, floor, [[0, 0], [1, 1]]));
+  assert.deepEqual(Array.from(both.fix.ids).sort(), [0, 1]);
+  assert.equal(both.routeRevision, first.routeRevision);
+  assert.deepEqual(Array.from(both.route.at(-1)), map.route.at(-1));
+  assert.ok(both.fix.maneuver);
+  const offPath = track(scene(cv, floor, [[1, 1]]));
+  assert.ok(offPath.fix);
+  assert.equal(offPath.route.length, 0);
+});
+
+test('a surveyed aisle keeps its arrow across distant markers and shows a bearing back from the side', async () => {
+  const { cv } = await new Promise(resolve => require('@techstark/opencv-js').then(cv => resolve({ cv })));
+  const marks = [{ id: 2, center: [0, 5], yawDeg: 0 }, { id: 7, center: [2.2, 1.6], yawDeg: 0 }];
+  const hall = { tags: marks, tagSideM: .75, route: [[0, -2], [0, 10]], camera: { diagonalFovDeg: 70 } };
+  const track = startWorker(cv, { station: hall });
+  function sight(worker, x, tag, time) {
+    const floor = floorAt([x, 0, 1.3], [...tag.center, 0]);
+    const frame = worker(scene(cv, floor, [[tag.id, tag.id]], false, hall.tagSideM, marks), { frameTimeMs: time });
+    assert.deepEqual(Array.from(frame.fix.ids), [tag.id]);
+    return { frame, floor };
+  }
+  const { frame, floor } = sight(track, 0, marks[0], 100);
+  const tip = floor(...frame.fix.arrow[4]), tail = floor(...frame.fix.arrow[0]);
+  assert.ok(tip[1] > tail[1] && tip[1] < marks[0].center[1] - 1.1);
+  const along = sight(track, 0, marks[1], 400).frame;
+  assert.equal(tagNetwork(hall).anchors[7], undefined);
+  assert.equal(along.routeRevision, frame.routeRevision);
+  assert.ok(along.fix.arrow || along.fix.screenDirection);
+
+  const beside = sight(track, 2.2, marks[0], 2000).frame.fix;
+  assert.equal(beside.screenDirection, 'left');
+  assert.equal(beside.arrived, false);
+  assert.equal(beside.arrow, null);
+  assert.equal(beside.guide.length, 0);
+
+  const parallel = startWorker(cv, { station: { ...hall, route: [[0,-2], [0,8], [4,8], [4,-2]] } });
+  const onAisle = sight(parallel, 0, marks[0], 100).frame;
+  const unknownAisle = parallel(scene(cv, floor, []), { frameTimeMs: 1500, knownRoute: onAisle.routeRevision,
+    guideCamera: { spaceId: 'default', referenceTimeMs: 100, cameraToWorld: [0,0,1,2, -1,0,0,0, 0,-1,0,1.3, 0,0,0,1] } });
+  assert.equal(unknownAisle.motionGuide.screenDirection, 'left', 'turn the last confirmed bearing without choosing a parallel aisle');
+  assert.equal(unknownAisle.motionGuide.guide.length, 0);
+  assert.equal(unknownAisle.motionGuide.maneuver, undefined);
+  const between = sight(parallel, 2.2, marks[0], 2000).frame.fix;
+  assert.equal(between.screenDirection, undefined);
+});
+
 test('legacy corridors keep their corners, endpoints and printed IDs without shortcutting a crossing', () => {
   const network = tagNetwork(corridor);
   assert.deepEqual(network.points[network.start], corridor.route[0]);
@@ -412,4 +811,70 @@ test('legacy corridors keep their corners, endpoints and printed IDs without sho
   const crossing = tagNetwork({ route: [[0, 0], [2, 2], [0, 2], [2, 0]], tags: [{ id: 9, center: [1, 1] }] });
   assert.equal(crossing.anchors[9], undefined);
   assert.ok(routeTree(crossing).costs[crossing.start] > 7);
+});
+
+test('live tag edits rebuild the guide and a newly observed tag can guide back to the original start', async () => {
+  const { cv } = await new Promise(resolve => require('@techstark/opencv-js').then(cv => resolve({ cv })));
+  const tag = (id, x, y) => ({ id, center: [x, y], yawDeg: 0 });
+  const start = tag(40, 0, 0), goal = tag(7, 0, 3);
+  const initial = { ...station, terrain: undefined, route: [], tags: [start, goal], autoRoute: { startTag: 40, endTag: 7 } };
+  const track = startWorker(cv, { station: initial });
+  function sight(layout, id, eye, look, options) {
+    const floor = floorAt(eye, look);
+    const frame = track(scene(cv, floor, [[id, id]], false, .16, layout.tags), options);
+    assert.deepEqual(Array.from(frame.fix.ids), [id]);
+    assert.ok(frame.fix.guide.length && frame.fix.arrow);
+    const tip = floor(...frame.fix.arrow[4]), tail = floor(...frame.fix.arrow[0]);
+    return { frame, dx: tip[0] - tail[0], dy: tip[1] - tail[1] };
+  }
+  const before = sight(initial, 40, [0, -.45, 1.15], [0, .62, 0]);
+  assert.ok(before.dy > .3);
+  const moved = tag(7, 3, 0), added = tag(103, 1.5, 0);
+  const revised = { ...initial, tags: [moved, added, start] };
+  const after = sight(revised, 40, [-.45, 0, 1.15], [.62, 0, 0],
+    { layouts: [{ id: 'default', station: revised }], knownRoute: before.frame.routeRevision });
+  assert.deepEqual(JSON.parse(JSON.stringify(after.frame.route)), [start.center, added.center, moved.center]);
+  assert.ok(after.dx > .3 && Math.abs(after.dy) < .2);
+  const network = tagNetwork(revised);
+  const back = sight(revised, 103, [1.95, 0, 1.15], [.88, 0, 0],
+    { destination: { spaceId: 'default', tree: routeTree(network, network.anchors[40]) } });
+  assert.deepEqual(Array.from(back.frame.route.at(-1)), start.center);
+  assert.ok(back.dx < -.3);
+});
+
+test('automatic passages stay inside concave floor boundaries and honor walking points', () => {
+  // Both endpoints and the midpoint of the direct segment are indoors. A
+  // narrow cut near its far end requires taking the corner tags below it.
+  const outline = [[0, 0], [10, 0], [10, 4], [8.1, 4], [8.1, 1], [8, 1], [8, 4], [0, 4]];
+  const tags = [[10, [1, 3]], [14, [7.9, .8]], [25, [8.2, .8]], [37, [9, 3]]]
+    .map(([id, center]) => ({ id, center, yawDeg: 0 }));
+  tags.push({ id: 70, center: [11, 3], walkPoint: [9, 3], yawDeg: 0 }, { id: 71, center: [8.05, 2], yawDeg: 0 });
+  const layout = { route: [], terrain: { outline }, tags, autoRoute: { startTag: 10, endTag: 70 } };
+  const n = tagNetwork(layout);
+  assert.equal(n.anchors[70], n.anchors[37]);
+  assert.equal(n.anchors[71], undefined);
+  assert.deepEqual(defaultWalk(layout), [tags[0].center, tags[1].center, tags[2].center, tags[3].center]);
+  for (const boundary of [outline, [...outline].reverse()]) {
+    const detour = defaultWalk({ ...layout, terrain: { outline: boundary }, tags: [tags[0], tags[4]] });
+    assert.deepEqual(detour[0], tags[0].center);
+    assert.deepEqual(detour.at(-1), tags[4].walkPoint);
+    assert.ok(detour.length > 2, 'the floor plan supplies an unmarked turn');
+    for (let i = 1; i < detour.length; i++) {
+      const [x, y] = detour[i - 1], [u, v] = detour[i];
+      if (x < 8.05 && u > 8.05) assert.ok(y + (v - y) * (8.05 - x) / (u - x) <= 1, 'the detour stays below the cut');
+    }
+  }
+  assert.deepEqual(defaultWalk({ ...layout, autoRoute: { startTag: 10, endTag: 71 } }), []);
+  assert.deepEqual(defaultWalk({ ...layout, autoRoute: { startTag: 70, endTag: 10 } }), defaultWalk(layout).reverse());
+});
+
+test('moving a tag in a loop switches the shortest branch without changing the destination ID', () => {
+  const tag = (id, x, y) => ({ id, center: [x, y], yawDeg: 0 });
+  const a = tag(12, 0, 0), b = tag(48, 1, 5), c = tag(3, 4, 5), d = tag(5, 4, 0);
+  const layout = { tags: [a, b, c, d], route: [], autoRoute: { startTag: a.id, endTag: c.id } };
+  assert.deepEqual(defaultWalk(layout), [a.center, b.center, c.center]);
+  const moved = { ...layout, tags: [c, { ...b, center: [-1, 5] }, d, a] };
+  assert.deepEqual(defaultWalk(moved), [a.center, d.center, c.center]);
+  const added = tag(101, 4, 2);
+  assert.deepEqual(defaultWalk({ ...moved, tags: [...moved.tags, added] }), [a.center, d.center, added.center, c.center]);
 });

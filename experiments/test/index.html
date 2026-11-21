@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <meta name="theme-color" content="#0b1b3a" />
+    <title>이리로 · QR 실내 길안내</title>
+    <!--
+      ?slam=1 옵션은 Niantic Spatial, Inc.의 XR Engine(8th Wall 엔진 배포용 바이너리)을 사용합니다 (vendor/xr8/).
+      This product includes the XR Engine software developed by Niantic Spatial, Inc.
+      Copyright © 2026 Niantic Spatial, Inc. All rights reserved.
+      License: https://github.com/8thwall/engine/blob/main/LICENSE
+    -->
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="css/style.css" />
+    <script>
+      // ?slam=1 일 때만 추적 엔진을 불러온다 (가상 역에서는 엔진을 흉내 내므로 불러오지 않는다).
+      // 엔진 문서에 나온 그대로의 script 태그가 되도록 여기서 써 넣는다. 못 받으면 표시해 둔다.
+      (function () {
+        var q = location.search.replace(/(?!^)\?/g, '&');
+        if (/[?&]slam=1(&|$)/.test(q) && !/[?&]sim=1(&|$)/.test(q)) {
+          document.write(
+            '<script async src="vendor/xr8/xr.js" data-preload-chunks="slam" onerror="window.__xr8Failed = true"><\/script>'
+          );
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="app">
+      <!-- 카메라 영상(또는 가상 역)과 그 위에 겹치는 AR -->
+      <div id="stage">
+        <video id="cam" playsinline muted autoplay></video>
+        <!-- ?slam=1 일 때 카메라 움직임 추적 엔진이 영상을 그리는 곳 -->
+        <canvas id="xrfeed" class="hidden"></canvas>
+        <canvas id="simcam" class="hidden"></canvas>
+        <canvas id="ar"></canvas>
+        <svg id="detfx" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+
+      <!-- 1. 첫 화면 -->
+      <section id="home" class="screen">
+        <div class="home-top">
+          <div class="logo" aria-hidden="true">
+            <svg viewBox="0 0 100 100">
+              <path d="M50 14 L86 50 L86 74 L50 38 L14 74 L14 50 Z" fill="#fff" />
+            </svg>
+          </div>
+          <h1 id="appName">이리로</h1>
+          <p id="tagline"></p>
+        </div>
+        <div id="langs" class="langs"></div>
+        <p id="nearInfo" class="near hidden"></p>
+        <p id="homeError" class="error"></p>
+        <button id="startBtn" class="primary big" type="button"></button>
+        <button id="simBtn" class="ghost" type="button"></button>
+        <p id="permHint" class="hint"></p>
+      </section>
+
+      <!-- 2. 목적지 고르기 -->
+      <section id="dest" class="screen hidden">
+        <h2 id="whereTo"></h2>
+        <button id="micBtn" class="mic" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M12 15a3.5 3.5 0 0 0 3.5-3.5v-5a3.5 3.5 0 0 0-7 0v5A3.5 3.5 0 0 0 12 15zm6-3.5a6 6 0 0 1-12 0H4.5a7.5 7.5 0 0 0 6.75 7.46V22h1.5v-3.04A7.5 7.5 0 0 0 19.5 11.5z"
+              fill="currentColor"
+            />
+          </svg>
+          <span id="micLabel"></span>
+        </button>
+        <form id="typeForm">
+          <input id="typeInput" type="text" autocomplete="off" enterkeyhint="search" />
+          <button id="typeBtn" type="submit"></button>
+        </form>
+        <p id="heard" class="heard hidden"></p>
+        <div id="candidates"></div>
+        <div id="destList"></div>
+      </section>
+
+      <!-- 3. 안내 화면: 영상 위에 뜨는 요소들 -->
+      <section id="nav" class="hidden">
+        <div id="hud" class="hidden">
+          <canvas id="turnIcon" width="144" height="144"></canvas>
+          <div class="hud-text">
+            <div id="insMain"></div>
+            <div id="insSub"></div>
+          </div>
+        </div>
+
+        <div id="scan" class="hidden">
+          <div class="reticle"><i></i><i></i><i></i><i></i></div>
+          <div id="scanTitle"></div>
+          <div id="scanSub"></div>
+        </div>
+
+        <div id="chip" class="chip hidden"></div>
+
+        <div id="edgeL" class="edge left hidden">
+          <div class="edge-arrow">◀</div>
+          <div id="edgeLText" class="edge-text"></div>
+        </div>
+        <div id="edgeR" class="edge right hidden">
+          <div class="edge-arrow">▶</div>
+          <div id="edgeRText" class="edge-text"></div>
+        </div>
+
+        <div id="toast" class="toast hidden"></div>
+        <pre id="debug" class="hidden"></pre>
+
+        <canvas id="mini" class="hidden"></canvas>
+
+        <div id="simBar" class="hidden">
+          <span id="simBadge"></span>
+          <button id="autoBtn" type="button"></button>
+          <button id="walkBtn" type="button" class="hidden"></button>
+        </div>
+
+        <div id="bottom">
+          <div class="dest-info">
+            <div id="destName"></div>
+            <div id="remain"></div>
+          </div>
+          <button id="voiceBtn" type="button"></button>
+          <button id="exitBtn" type="button"></button>
+        </div>
+      </section>
+
+      <!-- 4. 도착 -->
+      <section id="arrived" class="screen overlay hidden">
+        <div class="arrived-card">
+          <div class="check" aria-hidden="true">✓</div>
+          <h2 id="arrivedTitle"></h2>
+          <p id="arrivedName"></p>
+          <button id="againBtn" class="primary big" type="button"></button>
+        </div>
+      </section>
+    </div>
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>

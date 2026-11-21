@@ -1,7 +1,10 @@
+import { closeOverlay, updateUrl, useQuery } from '../urlState';
+import { integerParam } from '../navigation/journeyUrl';
+import { useLanguage } from '../i18n/LanguageSelect';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PassageBar } from './PassageProgress';
 import { measurePassage, passageMeters, pointAlong, type PassageRoute, type Turn } from './passageRoute';
-import { loadTrackingSpaces, spaceLabel, stationName, type Point, type SpaceLayout } from './station';
+import { indoorSpaceName, loadTrackingSpaces, type Point, type SpaceLayout } from './station';
 import './passage-preview.css';
 
 const arrows = {
@@ -22,13 +25,6 @@ const arrows = {
 function Icon({ name }: { name: keyof typeof arrows }) {
   return <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true"
     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={arrows[name]} /></svg>;
-}
-
-function routeName(layout: SpaceLayout) {
-  const links = layout.station.stationLinks;
-  const from = links?.find(stop => stop.routeEndpoint === 'start'), to = links?.find(stop => stop.routeEndpoint === 'end');
-  if (from && to && stationName(from.name) === stationName(to.name)) return stationName(from.name) + ' · ' + from.line + ' → ' + to.line;
-  return spaceLabel(layout.station);
 }
 
 function planGeometry(layout: SpaceLayout, route: PassageRoute) {
@@ -52,10 +48,11 @@ function planGeometry(layout: SpaceLayout, route: PassageRoute) {
 function PassagePlan({ route, layout, distance, stageIndex }: {
   route: PassageRoute; layout: SpaceLayout; distance: number; stageIndex: number;
 }) {
+  const { t, language } = useLanguage();
   const plan = useMemo(() => planGeometry(layout, route), [layout, route]);
   const { start, end } = plan;
   const position = plan.project(pointAlong(route, distance));
-  return <svg className="preview-plan" viewBox="0 0 416 278" role="img" aria-label={routeName(layout) + ' 실내 경로 평면도'}>
+  return <svg className="preview-plan" viewBox="0 0 416 278" role="img" aria-label={t('{name} 실내 경로 평면도', { name: indoorSpaceName(layout.station, language) })}>
     {plan.outline && <polygon points={plan.outline} className="preview-outline" />}
     <polyline points={plan.path} className="preview-path" />
     {plan.sections[stageIndex] && <polyline points={plan.sections[stageIndex]} className="preview-active-path" />}
@@ -63,7 +60,7 @@ function PassagePlan({ route, layout, distance, stageIndex }: {
     <circle cx={start[0]} cy={start[1]} r="5" className="preview-waypoint" />
     <rect x={end[0] - 5} y={end[1] - 5} width="10" height="10" rx="1" className="preview-waypoint" />
     {([['출발', start], ['도착', end]] as const).map(([label, [x, y]], index) =>
-      <text key={label} x={x} y={y + (index ? -16 : 26)} textAnchor="middle">{label}</text>)}
+      <text key={label} x={x} y={y + (index ? -16 : 26)} textAnchor="middle">{t(label)}</text>)}
     <circle cx={position[0]} cy={position[1]} r="8" className="preview-cursor" />
     <circle cx={position[0]} cy={position[1]} r="2.5" fill="#173d32" />
   </svg>;
@@ -72,11 +69,16 @@ function PassagePlan({ route, layout, distance, stageIndex }: {
 const directions: Record<Turn, string> = { straight: '직진', left: '좌회전 후 직진', right: '우회전 후 직진', uturn: '돌아서 직진' };
 
 function Playback({ layout, route }: { layout: SpaceLayout; route: PassageRoute }) {
-  const [distance, setDistance] = useState(0);
+  const { t, locale } = useLanguage();
+  const [distance, setDistance] = useState(() => {
+    const stage = integerParam(new URLSearchParams(location.search).get('stage'), 0, route.stages.length) ?? 0;
+    return route.stages[stage]?.offset ?? route.length;
+  });
   const [play, setPlay] = useState(false);
   const arrived = distance >= route.length;
   const playing = play && !arrived;
   const index = arrived ? route.stages.length : route.stages.findLastIndex(stage => stage.offset <= distance);
+  useEffect(() => { updateUrl({ stage: index || null }); }, [index]);
   const stage = route.stages[index], nextStage = route.stages[index + 1];
   useEffect(() => {
     if (!playing) return;
@@ -99,21 +101,21 @@ function Playback({ layout, route }: { layout: SpaceLayout; route: PassageRoute 
       <div className="preview-instruction">
         <div className="preview-direction" aria-hidden="true"><Icon name={stage?.turn ?? 'arrival'} /></div>
         <div aria-live="polite" aria-atomic="true" className="preview-cue">
-          <span>{arrived ? '경로 끝' : (index + 1) + ' / ' + route.stages.length + ' 구간'}</span>
-          <h3>{stage ? directions[stage.turn] : '도착'}</h3>
+          <span>{arrived ? t('경로 끝') : t('{current} / {total} 구간', { current: index + 1, total: route.stages.length })}</span>
+          <h3>{t(stage ? directions[stage.turn] : '도착')}</h3>
         </div>
-        <p>{arrived ? '전체 거리' : nextLabel} <strong>{passageMeters(arrived ? route.length : (nextStage?.offset ?? route.length) - distance)}</strong></p>
+        <p>{arrived ? t('전체 거리') : t(nextLabel)} <strong>{passageMeters(arrived ? route.length : (nextStage?.offset ?? route.length) - distance, locale)}</strong></p>
       </div>
     </div>
     <div className="preview-transport">
       <PassageBar route={route} distance={distance} />
       <div className="preview-actions">
-        <button type="button" disabled={index === 0} onClick={() => move(route.stages[index - 1].offset)}><Icon name="previous" />이전 단계</button>
+        <button type="button" disabled={index === 0} onClick={() => move(route.stages[index - 1].offset)}><Icon name="previous" />{t('이전 단계')}</button>
         <button type="button" className="preview-play" onClick={() => {
           if (arrived) setDistance(0);
           setPlay(!playing);
-        }}><Icon name={arrived ? 'replay' : playing ? 'pause' : 'play'} />{arrived ? '다시 재생' : playing ? '일시 정지' : '경로 재생'}</button>
-        <button type="button" disabled={arrived} onClick={() => move(nextStage?.offset ?? route.length)}>다음 단계<Icon name="next" /></button>
+        }}><Icon name={arrived ? 'replay' : playing ? 'pause' : 'play'} />{arrived ? t('다시 재생') : playing ? t('일시 정지') : t('경로 재생')}</button>
+        <button type="button" disabled={arrived} onClick={() => move(nextStage?.offset ?? route.length)}>{t('다음 단계')}<Icon name="next" /></button>
       </div>
     </div>
   </>;
@@ -122,9 +124,11 @@ function Playback({ layout, route }: { layout: SpaceLayout; route: PassageRoute 
 type MappedPassage = { layout: SpaceLayout; route: PassageRoute };
 
 function PreviewDialog({ dismiss }: { dismiss: () => void }) {
+  const { t, locale, language } = useLanguage();
   const dialog = useRef<HTMLDialogElement>(null);
   const [passages, setPassages] = useState<MappedPassage[]>();
-  const [selected, setSelected] = useState('');
+  const selected = useQuery().get('passage');
+  const [defaultPassage, setDefaultPassage] = useState('');
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
@@ -146,39 +150,40 @@ function PreviewDialog({ dismiss }: { dismiss: () => void }) {
         return links.some(link => link.routeEndpoint === 'start') && links.some(link => link.routeEndpoint === 'end');
       });
       setPassages(mapped);
-      setSelected((transfer ?? mapped[0])?.layout.id ?? '');
+      setDefaultPassage((transfer ?? mapped[0])?.layout.id ?? '');
     }).catch(() => { if (!controller.signal.aborted) setFailed(true); });
     return () => controller.abort();
   }, [attempt]);
-  const active = passages?.find(p => p.layout.id === selected);
+  const active = passages?.find(p => p.layout.id === selected) ?? passages?.find(p => p.layout.id === defaultPassage);
   function close() { dialog.current?.close(); dismiss(); }
   return <dialog className="passage-preview" ref={dialog} aria-labelledby="preview-title"
     onCancel={event => { event.preventDefault(); close(); }}>
     <header className="preview-header">
-      <h2 id="preview-title"><Icon name="route" />실내 경로 미리보기</h2>
-      <button type="button" autoFocus aria-label="미리보기 닫기" onClick={close}><Icon name="close" /></button>
+      <h2 id="preview-title"><Icon name="route" />{t('실내 경로 미리보기')}</h2>
+      <button type="button" autoFocus aria-label={t('미리보기 닫기')} onClick={close}><Icon name="close" /></button>
     </header>
     {active ? <>
       <div className="preview-route">
-        {passages && passages.length > 1 ? <select aria-label="미리 볼 실내 경로" value={selected} onChange={e => setSelected(e.target.value)}>
-          {passages.map(p => <option key={p.layout.id} value={p.layout.id}>{routeName(p.layout)}</option>)}
-        </select> : <strong>{routeName(active.layout)}</strong>}
-        <span>전체 {passageMeters(active.route.length)}</span>
+        {passages && passages.length > 1 ? <select aria-label={t('미리 볼 실내 경로')} value={active.layout.id} onChange={e => updateUrl({ passage: e.target.value, stage: null })}>
+          {passages.map(p => <option key={p.layout.id} value={p.layout.id}>{indoorSpaceName(p.layout.station, language)}</option>)}
+        </select> : <strong>{indoorSpaceName(active.layout.station, language)}</strong>}
+        <span>{t('전체')} {passageMeters(active.route.length, locale)}</span>
       </div>
-      <Playback key={selected} {...active} />
+      <Playback key={active.layout.id} {...active} />
     </> : <div className="preview-notice" role="status">{failed ? <>
-      경로를 불러올 수 없습니다. <button type="button" onClick={() => setAttempt(n => n + 1)}>다시 시도</button>
-    </> : passages ? '이 공간에 등록된 실내 경로가 없습니다.' : '등록된 실내 경로를 불러오는 중…'}</div>}
+      {t('경로를 불러올 수 없습니다.')} <button type="button" onClick={() => setAttempt(n => n + 1)}>{t('다시 시도')}</button>
+    </> : passages ? t('이 공간에 등록된 실내 경로가 없습니다.') : t('등록된 실내 경로를 불러오는 중…')}</div>}
   </dialog>;
 }
 
 export function PassagePreview({ disabled }: { disabled: boolean }) {
-  const [open, setOpen] = useState(false);
+  const { t } = useLanguage();
+  const open = useQuery().get('dialog') === 'preview';
   const trigger = useRef<HTMLButtonElement>(null);
   return <>
-    <button ref={trigger} type="button" className="preview-trigger" aria-haspopup="dialog" disabled={disabled} onClick={() => setOpen(true)}>
-      <Icon name="route" />실내 경로 미리보기<Icon name="next" />
+    <button ref={trigger} type="button" className="preview-trigger" aria-haspopup="dialog" disabled={disabled} onClick={() => updateUrl({ dialog: 'preview' }, 'push')}>
+      <Icon name="route" />{t('실내 경로 미리보기')}<Icon name="next" />
     </button>
-    {open && <PreviewDialog dismiss={() => { setOpen(false); trigger.current?.focus({ preventScroll: true }); }} />}
+    {open && <PreviewDialog dismiss={() => { closeOverlay({ dialog: null, passage: null, stage: null }); trigger.current?.focus({ preventScroll: true }); }} />}
   </>;
 }

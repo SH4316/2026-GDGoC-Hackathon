@@ -6,6 +6,7 @@ export type MotionAccess = 'granted' | 'denied' | 'implicit' | 'unavailable';
 const motionSensor = () => window.DeviceMotionEvent as
   (typeof DeviceMotionEvent & { requestPermission?: () => Promise<string> }) | undefined;
 let granted = false;
+let pendingPermission: Promise<MotionAccess> | undefined;
 
 export function motionAccess(): MotionAccess | 'prompt' {
   const sensor = motionSensor();
@@ -19,9 +20,14 @@ export async function requestMotionAccess(): Promise<MotionAccess> {
   if (!sensor) return 'unavailable';
   if (!sensor.requestPermission) return 'implicit';
   if (granted) return 'granted';
-  try { granted = await sensor.requestPermission() === 'granted'; }
-  catch { granted = false; }
-  return granted ? 'granted' : 'denied';
+  if (pendingPermission) return pendingPermission;
+  try {
+    pendingPermission = sensor.requestPermission().then((answer): MotionAccess => {
+      granted = answer === 'granted';
+      return granted ? 'granted' : 'denied';
+    }, (): MotionAccess => 'denied').finally(() => { pendingPermission = undefined; });
+    return pendingPermission;
+  } catch { return 'denied'; }
 }
 
 export const screenAngle = () => screen.orientation?.angle ?? (typeof window.orientation === 'number' ? window.orientation : null);

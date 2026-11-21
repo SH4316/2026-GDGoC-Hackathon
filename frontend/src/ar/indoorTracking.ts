@@ -6,11 +6,15 @@ import type { Point } from './station';
 export type MinimapPose = { spaceId: string; point: Point; headingDeg: number | null; source: 'tag' | 'motion' | 'last' };
 export type CameraPose = Pick<Fix, 'position' | 'cameraToWorld'>;
 type Step = { periodMs: number; sensorSign: number };
-type BufferedMotion = MotionSample & { velocity?: Vector2; step?: Step };
+type BufferedMotion = MotionSample & { velocity?: Vector2; step?: Step; gravity?: Vector3;
+  camera?: { attitude: Quaternion; point: Point; positionTracked: boolean; vertical?: Vector3 } };
 type ForeAftSample = { timeMs: number; acceleration: number };
 
 const radians = Math.PI / 180;
+const worldUp = new Vector3(0, 0, 1);
 const maxSampleGapMs = 350;
+const maxGravityAgeMs = 100;
+const motionHistoryMs = 2000; // Replay sensor events received while a camera result was being computed.
 const maxWalkingSpeed = 3.5; // m/s
 // A visual observation renews this short bridge. Fresh IMU samples alone cannot.
 const maxBlindMs = 1000;
@@ -115,6 +119,31 @@ function heading(forwardX: number, forwardY: number) {
   return Math.hypot(forwardX, forwardY) > 0.1 ? Math.atan2(forwardX, forwardY) / radians : null;
 }
 
+function levelGuideCamera(camera: Matrix4, up: [number, number, number]) {
+  // Preserve the surveyed azimuth while setting the camera's pitch and roll from gravity.
+  const vertical = new Vector3(...up);
+  const reference = new Vector3(0, 0, 1);
+  const lens = new Vector3().setFromMatrixColumn(camera, 2);
+  if (Math.abs(vertical.z) > .95 || Math.abs(lens.z) > .95) {
+    // A near-vertical lens has no stable azimuth. Use a horizontal image axis instead.
+    const rightTilt = Math.max(Math.abs(vertical.x), Math.abs(camera.elements[2]));
+    const downTilt = Math.max(Math.abs(vertical.y), Math.abs(camera.elements[6]));
+    reference.set(rightTilt <= downTilt ? 1 : 0, rightTilt <= downTilt ? 0 : 1, 0);
+  }
+  const worldReference = reference.clone().transformDirection(camera).setZ(0);
+  const imageReference = reference.clone().addScaledVector(vertical, -reference.dot(vertical));
+  if (worldReference.lengthSq() < .01 || imageReference.lengthSq() < .01) return;
+  worldReference.normalize(); imageReference.normalize();
+  const worldBasis = new Matrix4().makeBasis(worldReference, worldUp.clone().cross(worldReference), worldUp);
+  const imageBasis = new Matrix4().makeBasis(imageReference, vertical.clone().cross(imageReference), vertical);
+  camera.multiplyMatrices(worldBasis, imageBasis.transpose());
+}
+
+function cameraUp(deviceUp: Vector3, screenAngleDeg: number): [number, number, number] {
+  const v = deviceUp.applyAxisAngle(worldUp, screenAngleDeg * radians);
+  return [v.x, -v.y, -v.z];
+}
+
 function walkingDirection(point: Vector2, forward: Vector3, route: Point[]) {
   const bearing = new Vector2(forward.x, forward.y).normalize();
   let direction = bearing, nearest = 1; // Keep the measured lateral offset within a mapped corridor.
@@ -141,8 +170,16 @@ export class IndoorTracking {
   private visualPosition = new Vector2();
   private velocity = new Vector2();
   private deviceToWorld = new Quaternion();
+  private attitudeAt = -Infinity;
+  private gravitySign?: number;
+  private gyroVertical?: Vector3;
+  private gravityReadings: { timeMs: number; direction: Vector3 }[] = [];
+  private guidePosition = new Vector3();
+  private corridorYawDeg = 0;
+  private headingAt = -Infinity;
   private velocityReference?: { point: Vector2; timeMs: number };
   private correctedVelocity = new Vector2();
+  private visualAt = -Infinity;
   private fixAt = -Infinity;
   private integratedAt = -Infinity;
   private sensorAt = -Infinity;
@@ -162,7 +199,12 @@ export class IndoorTracking {
   suspend() {
     this.pending = [];
     this.cadence = new WalkingCadence();
-    this.fixAt = this.integratedAt = this.sensorAt = this.stepAt = -Infinity;
+    this.attitudeAt = this.visualAt = this.fixAt = this.integratedAt = this.sensorAt = this.stepAt = -Infinity;
+    this.corridorYawDeg = 0;
+    this.gravitySign = undefined;
+    this.gyroVertical = undefined;
+    this.gravityReadings = [];
+    this.headingAt = -Infinity;
   }
 
   private hasRecentMotion(timeMs: number) {
@@ -171,17 +213,114 @@ export class IndoorTracking {
   }
 
   floorAnchor(timeMs: number) {
-    if (!this.tag || timeMs - this.fixAt > maxBlindMs || !this.hasRecentMotion(timeMs)) return;
-    return { spaceId: this.tag.spaceId, timeMs: this.fixAt };
+    if (!this.tag || timeMs < this.visualAt || timeMs - this.visualAt > maxBlindMs) return;
+    return { spaceId: this.tag.spaceId, timeMs: this.visualAt };
+  }
+
+  walkingObservation(timeMs: number) {
+    if (!this.tag || !this.hasRecentMotion(timeMs) || this.stepAt <= this.fixAt ||
+        timeMs - this.stepAt > maxStepPeriodMs || this.stridesSinceFix * this.stepLengthM > 10) return;
+    const headingDeg = heading(this.velocity.x, this.velocity.y);
+    if (headingDeg !== null) return { spaceId: this.tag.spaceId, point: this.position.toArray(), headingDeg };
+  }
+
+  corridorCamera(timeMs: number, screenAngleDeg: number) {
+    // Pair the image with a raw gyro attitude at exposure, before the next motion update.
+    const reading = this.pending.findLast(sample => sample.timeMs <= timeMs);
+    if (!this.tag || !reading?.camera?.positionTracked || timeMs - reading.timeMs > 60) return;
+    const { attitude, point } = reading.camera;
+    const forward = new Vector3(0, 0, -1).applyQuaternion(attitude);
+    const headingDeg = heading(forward.x, forward.y);
+    if (headingDeg === null) return;
+    // Undo the display rotation and device-to-OpenCV axis change used by correct().
+    const up = worldUp.clone().applyQuaternion(attitude.clone().conjugate())
+      .applyAxisAngle(worldUp, screenAngleDeg * radians);
+    return { spaceId: this.tag.spaceId, point, headingDeg, up: [up.x, -up.y, -up.z] };
+  }
+
+  private gyroCameraAt(timeMs: number) {
+    const reading = this.pending.findLast(sample => sample.timeMs <= timeMs && sample.camera);
+    if (reading && timeMs - reading.timeMs <= maxSampleGapMs) return reading.camera;
+  }
+
+  private gravityAt(timeMs: number) {
+    const reading = this.gravityReadings.findLast(sample => sample.timeMs <= timeMs);
+    if (reading && timeMs - reading.timeMs <= maxGravityAgeMs) return reading.direction;
+  }
+
+  private calibrateGravitySign(timeMs: number) {
+    if (this.gravitySign || timeMs - this.visualAt > maxSampleGapMs) return;
+    const agreement = this.gravityAt(timeMs)?.clone().applyQuaternion(this.deviceToWorld).z;
+    if (agreement !== undefined && Math.abs(agreement) >= .85) this.gravitySign = Math.sign(agreement);
+  }
+
+  floorUp(timeMs: number, screenAngleDeg: number): [number, number, number] | undefined {
+    const gravity = this.gravityAt(timeMs);
+    if (!gravity || !this.gravitySign) return;
+    return cameraUp(gravity.clone().multiplyScalar(this.gravitySign), screenAngleDeg);
+  }
+
+  viewUp(timeMs: number, screenAngleDeg: number) {
+    const measured = this.floorUp(timeMs, screenAngleDeg);
+    if (measured) return measured;
+    const sample = this.gyroCameraAt(timeMs);
+    if (sample) return cameraUp((sample.vertical ?? worldUp).clone().applyQuaternion(sample.attitude.clone().conjugate()), screenAngleDeg);
+  }
+
+  guideCamera(timeMs: number, screenAngleDeg: number) {
+    const sample = this.gyroCameraAt(timeMs);
+    if (!this.tag || !sample) return;
+    const { attitude, point } = sample;
+    // Undo the display and lens-axis conversions used when the visual pose anchored the gyro.
+    const camera = new Matrix4().makeRotationZ(-this.corridorYawDeg * radians)
+      .multiply(new Matrix4().makeRotationFromQuaternion(attitude))
+      .multiply(new Matrix4().makeRotationZ(-screenAngleDeg * radians))
+      .multiply(new Matrix4().makeRotationX(Math.PI));
+    const up = this.floorUp(timeMs, screenAngleDeg) ?? (sample.vertical &&
+      cameraUp(sample.vertical.clone().applyQuaternion(attitude.clone().conjugate()), screenAngleDeg));
+    if (up) levelGuideCamera(camera, up);
+    camera.setPosition(point[0], point[1], this.guidePosition.z);
+    return { spaceId: this.tag.spaceId, referenceTimeMs: this.visualAt, cameraToWorld: camera.transpose().toArray() };
+  }
+
+  correctHeading(spaceId: string, yawDeg: number, frameAt: number) {
+    if (spaceId !== this.spaceId || frameAt <= this.headingAt || !Number.isFinite(yawDeg) ||
+        this.estimate?.source !== 'motion' || !this.hasRecentMotion(frameAt)) return;
+    const previous = this.corridorYawDeg;
+    this.corridorYawDeg = yawDeg;
+    this.headingAt = frameAt;
+    if (this.estimate.headingDeg !== null) {
+      const corrected = this.estimate.headingDeg + yawDeg - previous;
+      this.estimate = { ...this.estimate, headingDeg: (corrected + 540) % 360 - 180 };
+    }
   }
 
   correct(spaceId: string, fix: CameraPose & { referenceTimeMs?: number }, timeMs: number, angleDeg: number,
-          source: 'tag' | 'floor' = 'tag', route?: Point[]) {
-    if (timeMs <= this.fixAt) return;
-    if (source === 'floor' && (fix.referenceTimeMs !== this.fixAt || timeMs - this.fixAt > maxBlindMs ||
-        spaceId !== this.spaceId || !this.hasRecentMotion(timeMs))) return;
+          source: 'tag' | 'floor' = 'tag', route?: Point[], corridorYawDeg = 0) {
+    if (timeMs <= this.visualAt) return;
+    if (source === 'floor' && (fix.referenceTimeMs !== this.visualAt || timeMs - this.visualAt > maxBlindMs ||
+        spaceId !== this.spaceId)) return;
+    // Each measured floor pose can anchor the next image, including while motion sensors are silent.
+    this.visualAt = this.attitudeAt = timeMs;
     const point: Point = [fix.position[0], fix.position[1]];
     const m = fix.cameraToWorld;
+    // OpenCV image axes are right/down/forward. Motion axes are fixed to the
+    // natural display (right/up/out), even when the camera image is in landscape.
+    const basis = new Matrix4().fromArray(m).transpose()
+      .multiply(new Matrix4().makeRotationX(Math.PI))
+      .multiply(new Matrix4().makeRotationZ(angleDeg * radians));
+    this.deviceToWorld.setFromRotationMatrix(basis).normalize();
+    this.calibrateGravitySign(timeMs);
+    const gravity = this.gravityAt(timeMs);
+    this.gyroVertical = gravity && this.gravitySign
+      ? gravity.clone().multiplyScalar(this.gravitySign).applyQuaternion(this.deviceToWorld) : undefined;
+    this.guidePosition.set(...fix.position);
+    this.corridorYawDeg = corridorYawDeg;
+    this.headingAt = timeMs;
+    if (source === 'floor' && Math.abs(timeMs - this.sensorAt) > maxSampleGapMs) {
+      this.replayAfter(timeMs);
+      return false;
+    }
     if (source === 'tag') {
       this.route = route ?? [];
       if (spaceId !== this.spaceId) this.stepLengthM = defaultStepLengthM;
@@ -217,49 +356,78 @@ export class IndoorTracking {
     this.stepAt = -Infinity;
     this.stridesSinceFix = 0;
     this.correctedVelocity.copy(this.velocity);
-    // OpenCV image axes are right/down/forward. Motion axes are fixed to the
-    // natural display (right/up/out), even when the camera image is in landscape.
-    const basis = new Matrix4().fromArray(m).transpose()
-      .multiply(new Matrix4().makeRotationX(Math.PI))
-      .multiply(new Matrix4().makeRotationZ(angleDeg * radians));
-    this.deviceToWorld.setFromRotationMatrix(basis).normalize();
-    const headingDeg = heading(m[2], m[6]);
+    const rawHeading = heading(m[2], m[6]);
+    const headingDeg = rawHeading === null ? null : (rawHeading + corridorYawDeg + 540) % 360 - 180;
     if (source === 'tag') this.tag = { spaceId, point, headingDeg, source: 'tag' };
     this.estimate = source === 'floor' ? { spaceId, point, headingDeg, source: 'motion' } : undefined;
     this.fixAt = this.integratedAt = timeMs;
     this.stillSeconds = 0;
-    // A worker fix belongs to the captured frame. Reapply only later IMU samples.
-    this.pending = this.pending.filter(sample => sample.timeMs > timeMs);
-    for (const sample of this.pending) this.integrate(sample);
+    this.replayAfter(timeMs);
     return true;
   }
 
+  private replayAfter(timeMs: number) {
+    this.pending = this.pending.filter(sample => sample.timeMs > timeMs);
+    for (const sample of this.pending) this.trackMotion(sample);
+  }
+
   motion(sample: MotionSample) {
-    if (!Number.isFinite(sample.timeMs) || sample.timeMs <= this.fixAt ||
+    if (!Number.isFinite(sample.timeMs) || sample.timeMs <= this.visualAt ||
         sample.timeMs <= (this.pending.at(-1)?.timeMs ?? -Infinity)) return;
     if (sample.acceleration || sample.accelerationIncludingGravity) this.sensorAt = sample.timeMs;
     // Keep the detected step with the sample: a delayed camera result may replay it.
-    const reading = { ...sample, step: this.cadence.sample(sample) };
+    const reading: BufferedMotion = { ...sample, step: this.cadence.sample(sample) };
     this.pending.push(reading);
-    while (this.pending[0].timeMs < sample.timeMs - maxSampleGapMs) this.pending.shift();
-    return this.integrate(reading);
+    while (this.pending[0].timeMs < sample.timeMs - motionHistoryMs) this.pending.shift();
+    // Record physical gravity independently of camera replay. Subtract linear acceleration
+    // so stepping or braking cannot tilt the guide. Polarity is learned against a visual fix.
+    if (sample.accelerationIncludingGravity && sample.acceleration) {
+      const gravity = new Vector3(...sample.accelerationIncludingGravity).sub(new Vector3(...sample.acceleration));
+      const norm = gravity.length();
+      if (norm >= 8 && norm <= 12) {
+        reading.gravity = gravity.divideScalar(norm);
+        this.gravityReadings.push({ timeMs: sample.timeMs, direction: reading.gravity });
+      }
+    }
+    while (this.gravityReadings.length && this.gravityReadings[0].timeMs < sample.timeMs - motionHistoryMs) this.gravityReadings.shift();
+    return this.trackMotion(reading);
+  }
+
+  private trackMotion(sample: BufferedMotion) {
+    const elapsed = sample.timeMs - this.attitudeAt;
+    const rate = sample.rotationRate;
+    const hasRotation = !!rate && elapsed > 0 && elapsed <= maxSampleGapMs;
+    if (hasRotation) {
+      const axis = new Vector3(...rate);
+      const angle = axis.length() * radians * elapsed / 1000;
+      if (angle) this.deviceToWorld.multiply(new Quaternion().setFromAxisAngle(axis.normalize(), angle)).normalize();
+    }
+    // After a sensor gap, use the first new rate as the time origin for the next interval.
+    if (rate && Number.isFinite(this.visualAt)) this.attitudeAt = sample.timeMs;
+    this.calibrateGravitySign(sample.timeMs);
+    if (sample.gravity && this.gravitySign && Number.isFinite(this.visualAt)) {
+      // Keep the last measured vertical in the gyro's frame so an interruption in
+      // gravity samples cannot snap the guide back to a drifted pitch.
+      this.gyroVertical = sample.gravity.clone().multiplyScalar(this.gravitySign).applyQuaternion(this.deviceToWorld);
+    }
+    const estimate = this.integrate(sample);
+    const positionTracked = !!estimate && this.stridesSinceFix * this.stepLengthM <= 10;
+    if (positionTracked) this.guidePosition.set(estimate.point[0], estimate.point[1], this.guidePosition.z);
+    sample.camera = hasRotation ? { attitude: this.deviceToWorld.clone(), point: [this.guidePosition.x, this.guidePosition.y],
+      positionTracked, vertical: this.gyroVertical } : undefined;
+    return estimate;
   }
 
   private integrate(sample: BufferedMotion) {
-    const { timeMs, acceleration, accelerationIncludingGravity: total, rotationRate } = sample;
+    const { timeMs, acceleration, accelerationIncludingGravity: total } = sample;
     const elapsedMs = timeMs - this.integratedAt;
     const reading = acceleration ?? total;
-    if (!this.tag || !reading || elapsedMs <= 0 || elapsedMs > maxSampleGapMs) return;
+    if (!this.tag || this.visualAt !== this.fixAt || !reading || elapsedMs <= 0 || elapsedMs > maxSampleGapMs) return;
     const bridgeDt = Math.max(0, Math.min(timeMs, this.fixAt + maxBlindMs) - this.integratedAt) / 1000;
     this.integratedAt = timeMs;
 
-    if (rotationRate) {
-      // DeviceMotion rotationRate exposes the three body-axis rates in degrees/s.
-      const axis = new Vector3(...rotationRate);
-      const angle = axis.length() * radians * elapsedMs / 1000;
-      if (angle) this.deviceToWorld.multiply(new Quaternion().setFromAxisAngle(axis.normalize(), angle)).normalize();
-    }
     const forward = new Vector3(0, 0, -1).applyQuaternion(this.deviceToWorld);
+    if (this.corridorYawDeg) forward.applyAxisAngle(worldUp, -this.corridorYawDeg * radians);
     const headingDeg = heading(forward.x, forward.y);
     if (total) {
       // Resolve sensor polarity from the tag's world vertical, also during long walks.
@@ -291,6 +459,7 @@ export class IndoorTracking {
     if (this.estimate?.source === 'last' || bridgeDt <= 0) return;
     const dt = bridgeDt;
     const world = new Vector3(...reading).applyQuaternion(this.deviceToWorld);
+    if (this.corridorYawDeg) world.applyAxisAngle(worldUp, -this.corridorYawDeg * radians);
     const horizontal = new Vector2(world.x, world.y).multiplyScalar(this.accelerationSign);
     if (!acceleration) {
       // Gravity is vertical in map coordinates. Remove slow horizontal leakage
@@ -323,7 +492,11 @@ export class IndoorTracking {
   pose(now: number, tagVisible: boolean): MinimapPose | undefined {
     if (!this.tag || tagVisible) return this.tag;
     const supported = now - this.fixAt < maxBlindMs || now - this.stepAt <= maxStepPeriodMs;
-    if (this.estimate && supported && this.hasRecentMotion(now)) return this.estimate;
-    return { ...(this.estimate ?? this.tag), source: 'last', headingDeg: null };
+    if (this.estimate?.source === 'motion' && supported && this.hasRecentMotion(now)) return this.estimate;
+    const camera = this.gyroCameraAt(now);
+    const forward = camera && new Vector3(0, 0, -1).applyQuaternion(camera.attitude);
+    const rawHeading = forward ? heading(forward.x, forward.y) : null;
+    const headingDeg = rawHeading === null ? null : (rawHeading + this.corridorYawDeg + 540) % 360 - 180;
+    return { ...(this.estimate ?? this.tag), source: 'last', headingDeg };
   }
 }

@@ -1,23 +1,32 @@
+import { copy, type Language } from '../i18n/language';
+import { stationLabel } from '../i18n/stationLabel';
 import opencvUrl from '@techstark/opencv-js/dist/opencv.js?url';
 
 import { IndoorTracking, type CameraPose, type MinimapPose } from './indoorTracking';
 import { indoorCue, type IndoorCue, type Maneuver } from './indoorGuidance';
-import { routeTree, tagNetwork } from './tagRouting';
+import { nearArrivalTag, routeTree, tagNetwork } from './tagRouting';
 import { readMotion, screenAngle } from './motion';
 import { watchCameraFrames } from './videoFrames';
+import { compareCameraViews, createCameraViewSampler, type CameraView } from './cameraView';
 import type { Fix, Intrinsics } from './recording';
-import type { Point, SpaceLayout } from './station';
+import { stationName, type Point, type SpaceLayout } from './station';
 import type { TagModels } from './models';
 import type { DebugSession } from './debugSession';
 
 type SpaceSelection = { preferredSpace: string };
 export type TagReference = { spaceId: string; id: number };
+export type GuideDirection = NonNullable<Maneuver['direction']> | 'forward';
+type Bearing = { direction: GuideDirection; angleDeg?: number };
+type FloorTiltLimit = { up: [number, number, number]; minDot: number };
 type Hooks = {
+  language: () => Language;
   ready: () => void;
+  allowGuidance: (space: SpaceLayout) => boolean;
   located: (space: SpaceLayout) => void;
   arrived: (space: SpaceLayout) => void;
   cue: (cue: IndoorCue | undefined) => void;
-  destinationNearby: (spaceId: string | undefined) => void;
+  direction: (direction: GuideDirection | undefined, angleDeg?: number) => void;
+  destinationNearby: (spaceId?: string, screenDoorSpaceId?: string, selectedTag?: number) => void;
   minimap: (pose: MinimapPose | undefined) => void;
   tagSeen: (tag: TagReference) => void;
   chooseSpace: (ids: string[]) => void;
@@ -28,14 +37,19 @@ type Hooks = {
   debug: () => DebugSession | null;
   error: (message: string) => void;
   state: (state: string, indoorHint?: string) => void;
-  modelNotice: (message: string) => void;
+  modelNotice: (message: string, tagId?: number) => void;
   frame: (canvas: HTMLCanvasElement, at: number, mediaTimeS: number, intrinsics: Intrinsics, fix: Fix | null) => void;
   pause: () => void;
 };
 type Detection = { id: number; image: Point[]; registered: boolean };
-type Frame = { type: 'frame'; routeRevision?: number; route?: Point[]; spaceId?: string; referenceTag?: TagReference; candidates?: string[]; fix: (Fix & { destinationDistance: number; maneuver?: Maneuver; guide?: Point[][] }) | null;
+type VisualGuidance = { maneuver?: Maneuver; guide?: Point[][]; arrow?: Point[] | null; screenDirection?: GuideDirection;
+  screenAngleDeg?: number; routeBearing?: Bearing; floorVisible?: boolean; floorTiltLimit?: FloorTiltLimit };
+type Frame = { type: 'frame'; routeRevision?: number; route?: Point[]; spaceId?: string; referenceTag?: TagReference; candidates?: string[]; fix: (Fix & VisualGuidance & { destinationDistance: number }) | null;
   recording?: { spaceId: string; intrinsics: Intrinsics; fix: Fix | null };
-  floorMotion?: CameraPose & { spaceId: string; referenceTimeMs: number; guide?: Point[][] }; pendingFloorSpace?: string;
+  floorMotion?: CameraPose & VisualGuidance & { spaceId: string; referenceTimeMs: number }; pendingFloorSpace?: string;
+  motionGuide?: VisualGuidance & { spaceId: string };
+  walking?: { spaceId: string; maneuver: Maneuver };
+  corridorHeading?: { spaceId: string; yawDeg: number };
   intrinsics?: Intrinsics; detections: Detection[] };
 type Reply = { type: 'ready' } | { type: 'error'; message: string } | Frame;
 
@@ -50,7 +64,7 @@ declare global {
 const STALE_MS = 350;
 const MAP_RETURN_RADIUS_M = 1;
 
-function markTag(ctx: CanvasRenderingContext2D, tag: Detection, [left, top, right, bottom]: number[]) {
+function markTag(ctx: CanvasRenderingContext2D, tag: Detection, [left, top, right, bottom]: number[], language: Language) {
   const { width, height } = ctx.canvas;
   const size = Math.max(14, Math.round(Math.max(width, height) / 48));
   const xs = tag.image.map(p => p[0]), ys = tag.image.map(p => p[1]);
@@ -65,7 +79,7 @@ function markTag(ctx: CanvasRenderingContext2D, tag: Detection, [left, top, righ
   for (const corner of tag.image.slice(1)) ctx.lineTo(...corner);
   ctx.closePath();
   ctx.stroke();
-  const label = 'ID ' + tag.id + (tag.registered ? '' : ' · 미등록');
+  const label = 'ID ' + tag.id + (tag.registered ? '' : ' · ' + copy[language]('미등록'));
   ctx.font = '600 ' + size + 'px system-ui, sans-serif';
   const labelWidth = Math.ceil(ctx.measureText(label).width) + 12;
   const labelHeight = size + 7, gap = 5;
@@ -101,18 +115,33 @@ function drawGuide(ctx: CanvasRenderingContext2D, polygons: Point[][]) {
   ctx.fill();
 }
 
+function drawArrow(ctx: CanvasRenderingContext2D, points: Point[]) {
+  ctx.beginPath();
+  ctx.moveTo(...points[0]);
+  for (const point of points.slice(1)) ctx.lineTo(...point);
+  ctx.closePath();
+  ctx.fillStyle = '#17c879';
+  ctx.fill();
+  ctx.lineWidth = Math.max(1.5, ctx.canvas.width / 310);
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#ffffff';
+  ctx.stroke();
+}
+
 export function openPassage(video: HTMLVideoElement, guideCanvas: HTMLCanvasElement, overlay: HTMLCanvasElement, modelCanvas: HTMLCanvasElement,
                             spaces: SpaceLayout[], hooks: Hooks) {
   const lifetime = new AbortController();
   const capture = document.createElement('canvas');
   const pixels = capture.getContext('2d', { willReadFrequently: true })!;
+  const readView = createCameraViewSampler(video);
   const drawing = overlay.getContext('2d')!;
   const guideDrawing = guideCanvas.getContext('2d')!;
   const base = import.meta.env.BASE_URL;
+  const corridorHeadingEnabled = new URLSearchParams(location.search).get('vp') !== '0';
   let worker: Worker | undefined;
   let models: TagModels | undefined;
   const layouts = new Map(spaces.map(space => [space.id, space]));
-  const networks = new Map(spaces.map(space => [space.id, tagNetwork(space.station)]));
+  let frameLayouts = spaces;
   let frameDestination: TagReference | undefined;
   let routeRevision: number | undefined;
   let activeRoute: Point[] = [];
@@ -127,6 +156,8 @@ export function openPassage(video: HTMLVideoElement, guideCanvas: HTMLCanvasElem
   let clearTimer: number | undefined;
   let frameMediaTime = 0;
   let frameAt = 0;
+  let frameView: CameraView;
+  let presentedAt = 0;
   let frameAngle = 0;
   let frameSelection: SpaceSelection | undefined;
   let frameBounds = [0, 0, 0, 0];
@@ -136,17 +167,47 @@ export function openPassage(video: HTMLVideoElement, guideCanvas: HTMLCanvasElem
   let shownPose: MinimapPose | undefined;
   let shownCue: IndoorCue | undefined;
   let arrivedSpace: string | undefined;
-  let lastGuide: { spaceId: string; at: number } | undefined;
+  let lastGuide: { spaceId: string; at: number; bearing?: Bearing; onFloor: boolean; displayAngle: number; tilt?: FloorTiltLimit;
+    view: CameraView; verifiedAt: number } | undefined;
+  let shownBearing: Bearing | undefined;
+  let preferredSpace = hooks.selection()?.preferredSpace;
+
+  function workerLayouts() {
+    return spaces.map(({ id, station, network }) => ({ id, station, tree: routeTree(network ?? tagNetwork(station)) }));
+  }
+
+  function updateLayouts(next: SpaceLayout[]) {
+    spaces = next;
+    layouts.clear();
+    for (const space of next) layouts.set(space.id, space);
+    clearTimeout(clearTimer);
+    tracking = new IndoorTracking();
+    clear();
+    models?.dispose();
+    models = undefined;
+    modelSpace = undefined;
+    modelRevision++;
+    arrivedSpace = undefined;
+    frameDestination = undefined;
+    routeRevision = undefined;
+    activeRoute = [];
+    worker?.postMessage({ type: 'layouts', spaces: workerLayouts() });
+  }
 
   function publishCue(cue?: IndoorCue) {
-    if (cue?.key === shownCue?.key) return;
+    if (cue?.key === shownCue?.key && cue?.language === shownCue?.language) return;
     shownCue = cue;
     hooks.cue(cue);
   }
 
   function publishMinimap() {
     const selectedId = hooks.selection()?.preferredSpace;
-    if (selectedId && tracking.spaceId && selectedId !== tracking.spaceId) tracking = new IndoorTracking();
+    if (selectedId !== preferredSpace) {
+      preferredSpace = selectedId;
+      if (selectedId && lastGuide && selectedId !== lastGuide.spaceId) clearGuide();
+      if (selectedId && tracking.spaceId && selectedId !== tracking.spaceId) tracking = new IndoorTracking();
+    }
+    if (lastGuide && frameDestination !== hooks.destination()) clearGuide();
     const pose = tracking.pose(performance.now(), fixed);
     if (pose === shownPose || (pose && shownPose && pose.spaceId === shownPose.spaceId && pose.source === shownPose.source &&
         pose.headingDeg === shownPose.headingDeg && pose.point[0] === shownPose.point[0] && pose.point[1] === shownPose.point[1])) return;
@@ -157,6 +218,7 @@ export function openPassage(video: HTMLVideoElement, guideCanvas: HTMLCanvasElem
   function onMotion(event: DeviceMotionEvent) {
     const sample = readMotion(event);
     const estimate = tracking.motion(sample);
+    if (lastGuide?.onFloor && tiltAllowsFloor(lastGuide.tilt, sample.timeMs, lastGuide.displayAngle) === false) showLastDirection();
     hooks.debug()?.motion(sample, fixed ? undefined : estimate);
   }
 
@@ -169,9 +231,57 @@ export function openPassage(video: HTMLVideoElement, guideCanvas: HTMLCanvasElem
     publishMinimap();
   }
 
+  function showBearing(bearing?: Bearing) {
+    const angleDeg = bearing?.angleDeg === undefined ? undefined : Math.round(bearing.angleDeg);
+    if (shownBearing?.direction === bearing?.direction && shownBearing?.angleDeg === angleDeg) return;
+    shownBearing = bearing && { direction: bearing.direction, angleDeg };
+    hooks.direction(bearing?.direction, angleDeg);
+  }
+
+  function clearFloor() {
+    if (lastGuide?.onFloor) {
+      guideDrawing.clearRect(0, 0, guideCanvas.width, guideCanvas.height);
+      lastGuide.onFloor = false;
+    }
+  }
+
   function clearGuide() {
-    guideDrawing.clearRect(0, 0, guideCanvas.width, guideCanvas.height);
+    clearFloor();
+    showBearing();
     lastGuide = undefined;
+  }
+
+  function showLastDirection() {
+    clearFloor();
+    showBearing(lastGuide?.bearing);
+  }
+
+  function tiltAllowsFloor(limit: FloorTiltLimit | undefined, now: number, displayAngle: number) {
+    const currentAngle = screenAngle() ?? 0;
+    if (displayAngle !== currentAngle) return false;
+    if (!limit) return;
+    const up = tracking.viewUp(now, currentAngle);
+    if (up) return up[0]*limit.up[0] + up[1]*limit.up[1] + up[2]*limit.up[2] >= limit.minDot;
+  }
+
+  function canPlaceOnVideo(appearance: ReturnType<typeof compareCameraViews>, tilt: boolean | undefined) {
+    return appearance !== 'changed' && tilt !== false && (appearance === 'matching' || tilt === true);
+  }
+
+  function paintGuide(spaceId: string, visual: VisualGuidance, fresh: boolean, appearance: ReturnType<typeof compareCameraViews>) {
+    // Screen coordinates belong to one camera view. Only the direction can outlive it.
+    const direction = visual.maneuver?.kind === 'realign' ? visual.maneuver.direction : visual.screenDirection;
+    const bearing = direction ? { direction, angleDeg: visual.screenAngleDeg } : visual.routeBearing ?? lastGuide?.bearing;
+    const floorVisible = fresh && visual.floorVisible !== false &&
+      canPlaceOnVideo(appearance, tiltAllowsFloor(visual.floorTiltLimit, performance.now(), frameAngle));
+    const guide = floorVisible && visual.guide?.length ? visual.guide : undefined;
+    const arrow = floorVisible && !direction && visual.arrow?.length ? visual.arrow : undefined;
+    clearFloor();
+    if (guide) drawGuide(guideDrawing, guide);
+    if (arrow) drawArrow(guideDrawing, arrow);
+    showBearing(arrow ? undefined : bearing);
+    lastGuide = { spaceId, at: frameAt, bearing, onFloor: !!(guide || arrow), displayAngle: frameAngle, tilt: visual.floorTiltLimit,
+      view: frameView, verifiedAt: presentedAt };
   }
 
   function clear() {
@@ -207,61 +317,90 @@ export function openPassage(video: HTMLVideoElement, guideCanvas: HTMLCanvasElem
     modelRevision++;
   }
 
-  function expire() {
-    clear();
-    hooks.state('태그 탐색 중');
+  function searching() {
+    const hint = lastGuide?.bearing ? '마지막으로 확인한 방향입니다. 태그를 다시 비추면 갱신됩니다.' : undefined;
+    hooks.state('태그 탐색 중', hint);
   }
 
-  function paint({ spaceId, route, routeRevision: revision, referenceTag, candidates, fix, floorMotion, pendingFloorSpace, detections, intrinsics }: Frame) {
+  function expire() {
+    clearTags();
+    showLastDirection();
+    searching();
+  }
+
+  function expireLiveObservations() {
+    const remaining = lastGuide?.onFloor ? lastGuide.verifiedAt + STALE_MS - performance.now() : 0;
+    if (remaining <= 0) { expire(); return; }
+    // New matching video presentations can keep a projection in place while the next tag result is pending.
+    clearTags();
+    searching();
+    clearTimer = window.setTimeout(expireLiveObservations, remaining);
+  }
+
+  function paint({ spaceId, route, routeRevision: revision, referenceTag, candidates, fix, floorMotion, motionGuide, pendingFloorSpace, walking, corridorHeading, detections, intrinsics }: Frame) {
     clearTimeout(clearTimer);
+    const gyroGuide = motionGuide && motionGuide.spaceId === tracking.spaceId && !candidates &&
+      (!referenceTag || referenceTag.spaceId === motionGuide.spaceId) ? motionGuide : undefined;
+    const observedSpaceId = referenceTag?.spaceId ?? (fix && spaceId) ?? floorMotion?.spaceId ?? gyroGuide?.spaceId ?? walking?.spaceId ?? corridorHeading?.spaceId ?? pendingFloorSpace;
+    if (lastGuide && (candidates || (observedSpaceId && observedSpaceId !== lastGuide.spaceId) ||
+        fix?.arrived || (route && revision !== routeRevision))) clearGuide();
     const age = performance.now() - frameAt;
-    if (age >= STALE_MS) { expire(); return; }
+    // The live video can advance just before this reply, even before its next presentation callback.
+    const appearance = age < STALE_MS && video.readyState >= 2 && video.videoWidth && video.videoHeight
+      ? compareCameraViews(frameView, readView()) : 'changed';
+    const stale = appearance === 'changed';
+    if (stale && !fix && !floorMotion && !gyroGuide) { expire(); return; }
+    if (referenceTag) {
+      if (tracking.spaceId && referenceTag.spaceId !== tracking.spaceId) tracking = new IndoorTracking();
+      if (!stale) hooks.tagSeen(referenceTag);
+    }
+    const observedSpace = observedSpaceId && layouts.get(observedSpaceId);
+    if (observedSpace && !hooks.allowGuidance(observedSpace)) {
+      if (tracking.spaceId) tracking = new IndoorTracking();
+      routeRevision = undefined;
+      activeRoute = [];
+      arrivedSpace = undefined;
+      clear();
+      hooks.destinationNearby(undefined);
+      if (stale) { expire(); return; }
+      for (const tag of detections) markTag(drawing, tag, frameBounds, hooks.language());
+      const links = observedSpace.station.stationLinks;
+      const name = links?.[0]?.name;
+      const place = name && links?.every(link => link.name === name) ? stationLabel(stationName(name), hooks.language()) + ' ' : '';
+      hooks.state('태그 인식', copy[hooks.language()]('{place}태그를 확인했습니다. 2D 경로를 따라가세요.', { place }));
+      clearTimer = window.setTimeout(expire, STALE_MS - age);
+      return;
+    }
     if (spaceId && fix && route) {
       activeRoute = route;
       routeRevision = revision;
       hooks.route(spaceId, route);
     }
-    const floorAccepted = floorMotion && tracking.correct(floorMotion.spaceId, floorMotion, frameAt, frameAngle, 'floor');
-    if (floorAccepted) {
+    const floorCorrection = floorMotion && tracking.correct(floorMotion.spaceId, floorMotion, frameAt, frameAngle, 'floor', undefined,
+      corridorHeading?.spaceId === floorMotion.spaceId ? corridorHeading.yawDeg : 0);
+    if (floorCorrection) {
       hooks.debug()?.visual(frameAt, 'floor', floorMotion.spaceId, floorMotion.position);
     }
-    const guideSpace = fix ? spaceId : floorAccepted ? floorMotion.spaceId : undefined;
-    const guide = fix?.guide ?? (floorAccepted ? floorMotion.guide : undefined);
-    // Optical flow runs at up to 10 Hz. Hold only between scheduled matches in the same space.
-    if (!lastGuide || !pendingFloorSpace || pendingFloorSpace !== lastGuide.spaceId || frameAt - lastGuide.at > 130) {
-      clearGuide();
-      if (guideSpace && guide?.length && !fix?.arrived && guideSpace !== arrivedSpace) {
-        drawGuide(guideDrawing, guide);
-        lastGuide = { spaceId: guideSpace, at: frameAt };
-      }
-    }
-    if (!fix && !detections.length) {
-      if (!lastGuide) { expire(); return; }
-      clearTags();
-      hooks.state('위치 추정 중', '다음 태그를 비추면 위치가 보정됩니다.');
-      clearTimer = window.setTimeout(expire, Math.max(0, STALE_MS - (performance.now() - lastGuide.at)));
-      return;
-    }
-    if (referenceTag) {
-      if (tracking.spaceId && referenceTag.spaceId !== tracking.spaceId) tracking = new IndoorTracking();
-      hooks.tagSeen(referenceTag);
-    }
-    drawing.clearRect(0, 0, overlay.width, overlay.height);
-    const poly = fix?.arrow;
-    if (poly) {
-      drawing.beginPath();
-      drawing.moveTo(...poly[0]);
-      for (const point of poly.slice(1)) drawing.lineTo(...point);
-      drawing.closePath();
-      drawing.fillStyle = '#17c879';
-      drawing.fill();
-      drawing.lineWidth = Math.max(1.5, overlay.width / 310);
-      drawing.lineJoin = 'round';
-      drawing.strokeStyle = '#ffffff';
-      drawing.stroke();
-    }
-    for (const tag of detections) markTag(drawing, tag, frameBounds);
+    // Both fused and camera-only matches supply a measured projection for the overlay.
+    const matchedFloor = floorCorrection !== undefined ? floorMotion : undefined;
+    const visual = fix ?? matchedFloor;
+    const projection = visual ?? gyroGuide;
+    const guideSpace = fix ? spaceId : matchedFloor?.spaceId ?? gyroGuide?.spaceId;
+    const awaitingFloor = !projection && lastGuide && pendingFloorSpace === lastGuide.spaceId && frameAt - lastGuide.at <= 130;
     const space = spaceId ? layouts.get(spaceId) : undefined;
+    if (fix && space && tracking.correct(space.id, fix, frameAt, frameAngle, 'tag', activeRoute,
+      corridorHeading?.spaceId === space.id ? corridorHeading.yawDeg : 0)) {
+      hooks.debug()?.visual(frameAt, 'tag', space.id, fix.position);
+    }
+    if (projection) {
+      if (guideSpace && activeRoute.length >= 2 && !fix?.arrived && guideSpace !== arrivedSpace && projection.maneuver?.kind !== 'confirm')
+        paintGuide(guideSpace, projection, !!visual && !stale, appearance);
+      else clearGuide();
+    } else showLastDirection();
+    // A slow device can still show its most recent measured direction. Live cues require a fresh image.
+    if (stale) { expire(); return; }
+    drawing.clearRect(0, 0, overlay.width, overlay.height);
+    for (const tag of detections) markTag(drawing, tag, frameBounds, hooks.language());
     const spaceChanged = space !== modelSpace;
     if (fix && space && spaceChanged) {
       arrivedSpace = undefined;
@@ -295,28 +434,41 @@ export function openPassage(video: HTMLVideoElement, guideCanvas: HTMLCanvasElem
     }
     if ((!fixed || spaceChanged) && fix?.ids.length && space) hooks.located(space);
     fixed = !!fix;
-    if (fix && space && tracking.correct(space.id, fix, frameAt, frameAngle, 'tag', activeRoute)) {
-      hooks.debug()?.visual(frameAt, 'tag', space.id, fix.position);
-    }
+    if (corridorHeading && !fix && !floorMotion) tracking.correctHeading(corridorHeading.spaceId, corridorHeading.yawDeg, frameAt);
     publishMinimap();
-    if (!fix || !space) publishCue();
     if (fix && space) {
       const nearby = fix.destinationDistance <= MAP_RETURN_RADIUS_M;
-      hooks.destinationNearby(nearby ? space.id : undefined);
+      const target = frameDestination?.spaceId === space.id ? frameDestination.id : undefined;
+      const atTag = activeRoute.length > 0 && nearArrivalTag(space.station, fix.position, target);
+      hooks.destinationNearby(nearby ? space.id : undefined, atTag ? space.id : undefined, target);
       if (fix.arrived && arrivedSpace !== space.id) {
         arrivedSpace = space.id;
         hooks.arrived(space);
       }
-      const targetTag = frameDestination?.spaceId === space.id ? frameDestination.id : undefined;
-      let cue = indoorCue(space, fix.maneuver, !!fix.arrived, targetTag);
-      if (!activeRoute.length) {
-        const mapped = space.station.tagGraph || space.station.route.length;
+    }
+    if (!awaitingFloor) {
+      const guidanceSpaceId = guideSpace ?? walking?.spaceId;
+      const layout = guidanceSpaceId ? layouts.get(guidanceSpaceId) : undefined;
+      const targetTag = frameDestination?.spaceId === layout?.id ? frameDestination?.id : undefined;
+      let cue = layout && indoorCue(layout, visual?.maneuver ?? walking?.maneuver, !!fix?.arrived, targetTag, hooks.language());
+      if (fix && layout && !activeRoute.length) {
+        const mapped = layout.station.tagGraph || layout.network?.edges.length || layout.station.route.length ||
+          (layout.station.autoRoute && layout.station.tags.length >= 2);
         const text = mapped ? '현재 태그에서 목적지까지 연결된 통로가 없습니다.' : '이 공간에 등록된 실내 경로가 없습니다.';
-        cue = { key: space.id + '/unreachable', text };
+        cue = { language: hooks.language(), key: layout.id + '/unreachable', text: copy[hooks.language()](text) };
       }
-      if (cue && !fix.arrived) cue.key += '/' + routeRevision;
+      if (cue && !fix?.arrived) cue.key += '/' + routeRevision;
       publishCue(cue);
-      hooks.state('위치 인식', cue?.text ?? '다음 태그와 진행 방향의 바닥을 함께 비추세요.');
+    }
+    if (fix && space) {
+      const t = copy[hooks.language()];
+      const side = fix.screenDirection && { forward: '앞쪽', left: '왼쪽', right: '오른쪽', behind: '뒤쪽' }[fix.screenDirection];
+      const hint = side && !fix.maneuver ? t('등록된 통로가 {side}에 있습니다.', { side: t(side) }) : '다음 태그와 진행 방향의 바닥을 함께 비추세요.';
+      hooks.state('위치 인식', shownCue?.text ?? hint);
+    } else if (gyroGuide && !matchedFloor) {
+      hooks.state('방향 추정 중', shownCue?.text ?? '회전 센서로 방향을 추정하고 있습니다. 태그를 다시 비추면 보정됩니다.');
+    } else if (matchedFloor || awaitingFloor || walking) {
+      hooks.state('위치 추정 중', shownCue?.text ?? '다음 태그를 비추면 위치가 보정됩니다.');
     } else if (referenceTag) {
       hooks.state('태그 감지', '내 위치를 확인하려면 태그 전체가 화면에 크게 보이도록 비추세요.');
     } else if (candidates?.length) {
@@ -324,13 +476,25 @@ export function openPassage(video: HTMLVideoElement, guideCanvas: HTMLCanvasElem
       hooks.state('공간 선택', '같은 태그가 여러 공간에 등록되어 있습니다.');
     } else if (candidates) {
       hooks.state('공간 확인 필요', '한 공간의 태그만 비추세요.');
-    } else hooks.state('태그 감지', detections.some(tag => tag.registered)
-      ? '위치를 확인하려면 태그를 조금 더 가까이 비추세요.' : '미등록 태그 ID ' + detections[0].id + ' · 이 공간에 등록된 태그를 비추세요.');
-    clearTimer = window.setTimeout(expire, Math.max(0, STALE_MS - (performance.now() - frameAt)));
+    } else if (!detections.length) searching();
+    else hooks.state('태그 감지', detections.some(tag => tag.registered)
+      ? '위치를 확인하려면 태그를 조금 더 가까이 비추세요.' : copy[hooks.language()]('미등록 태그 ID {id} · 이 공간에 등록된 태그를 비추세요.', { id: detections[0].id }));
+    const lastFrame = awaitingFloor && lastGuide ? lastGuide.at : frameAt;
+    clearTimer = window.setTimeout(expireLiveObservations, Math.max(0, STALE_MS - (performance.now() - lastFrame)));
   }
 
-  function sample(now: number, mediaTime: number) {
-    if (!worker || !ready || busy || video.readyState < 2) return false;
+  function sample(now: number, mediaTime: number, newPresentation: boolean) {
+    if (!worker || !ready || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return false;
+    if (newPresentation) presentedAt = now;
+    if (busy && !(newPresentation && lastGuide?.onFloor)) return false;
+    const view = readView();
+    if (lastGuide?.onFloor && newPresentation) {
+      const appearance = compareCameraViews(lastGuide.view, view);
+      if (canPlaceOnVideo(appearance, tiltAllowsFloor(lastGuide.tilt, now, lastGuide.displayAngle))) lastGuide.verifiedAt = now;
+      else if (appearance === 'changed') expire();
+      else showLastDirection();
+    }
+    if (busy) return false;
     const ratio = Math.min(1, 960 / Math.max(video.videoWidth, video.videoHeight));
     const w = Math.round(video.videoWidth * ratio);
     const h = Math.round(video.videoHeight * ratio);
@@ -350,9 +514,11 @@ export function openPassage(video: HTMLVideoElement, guideCanvas: HTMLCanvasElem
     const marginY = cropped ? Math.max(0, (h - overlay.clientHeight / scale) / 2) : 0;
     frameBounds = [marginX, marginY, w - marginX, h - marginY];
     frameAt = now;
+    frameView = view;
     frameAngle = screenAngle() ?? 0;
     frameMediaTime = mediaTime;
     busy = true;
+    frameLayouts = spaces;
     frameSelection = hooks.selection();
     const destination = hooks.destination();
     if (destination !== frameDestination) {
@@ -360,19 +526,25 @@ export function openPassage(video: HTMLVideoElement, guideCanvas: HTMLCanvasElem
       const changed = new Set([frameDestination?.spaceId, destination?.spaceId]);
       for (const spaceId of changed) {
         if (!spaceId) continue;
-        const network = networks.get(spaceId);
-        if (!network) continue;
-        const goal = destination?.spaceId === spaceId ? network.anchors[destination.id] : network.end;
+        const space = layouts.get(spaceId);
+        if (!space) continue;
+        const network = space.network ?? tagNetwork(space.station);
+        const goal = destination?.spaceId === spaceId ? network.anchors[destination.id] ?? -1 : network.end;
         worker.postMessage({ type: 'destination', spaceId, tree: routeTree(network, goal) });
       }
       frameDestination = destination;
+      hooks.destinationNearby();
       arrivedSpace = undefined;
       routeRevision = undefined;
       activeRoute = [];
       clear();
     }
     worker.postMessage({ type: 'frame', w, h, rgba, bounds: frameBounds, frameTimeMs: now,
-      knownRoute: routeRevision, floorAnchor: tracking.floorAnchor(now), recordingSpaceId: hooks.recordingSpace(), ...frameSelection }, [rgba]);
+      knownRoute: routeRevision, floorAnchor: tracking.floorAnchor(now), walking: tracking.walkingObservation(now),
+      floorUp: tracking.floorUp(now, frameAngle),
+      guideCamera: activeRoute.length >= 2 && tracking.spaceId !== arrivedSpace ? tracking.guideCamera(now, frameAngle) : undefined,
+      corridorCamera: corridorHeadingEnabled ? tracking.corridorCamera(now, frameAngle) : undefined,
+      recordingSpaceId: hooks.recordingSpace(), ...frameSelection }, [rgba]);
     return true;
   }
 
@@ -397,7 +569,7 @@ export function openPassage(video: HTMLVideoElement, guideCanvas: HTMLCanvasElem
       video.srcObject = camera;
       await video.play();
       if (token !== generation) return;
-      worker = new Worker(base + 'ar/tracker.js?v=7');
+      worker = new Worker(base + 'ar/tracker.js?v=15');
       worker.onmessage = ({ data }: MessageEvent<Reply>) => {
         if (token !== generation) return;
         if (data.type === 'ready') {
@@ -409,7 +581,8 @@ export function openPassage(video: HTMLVideoElement, guideCanvas: HTMLCanvasElem
         }
         else if (data.type === 'frame') {
           busy = false;
-          if (frameSelection !== hooks.selection() || frameDestination !== hooks.destination()) { expire(); return; }
+          if (frameLayouts !== spaces) return;
+          if (frameSelection?.preferredSpace !== hooks.selection()?.preferredSpace || frameDestination !== hooks.destination()) { expire(); return; }
           const recording = data.recording;
           if (recording && recording.spaceId === hooks.recordingSpace())
             hooks.frame(capture, frameAt, frameMediaTime, recording.intrinsics, recording.fix);
@@ -420,8 +593,8 @@ export function openPassage(video: HTMLVideoElement, guideCanvas: HTMLCanvasElem
       worker.onerror = (error) => {
         if (token === generation) { console.error('역사 AR:', error.message); stop(); hooks.error('태그 인식기를 다시 연결해 주세요.'); }
       };
-      worker.postMessage({ type: 'init', library: new URL(opencvUrl, location.href).href,
-        spaces: spaces.map(space => ({ ...space, tree: routeTree(networks.get(space.id)!) })) });
+      worker.postMessage({ type: 'init', library: new URL(opencvUrl, location.href).href, corridorHeadingEnabled,
+        spaces: workerLayouts() });
     } catch (error) {
       if (token === generation) {
         console.warn('역사 AR:', error); stop();
@@ -439,5 +612,5 @@ export function openPassage(video: HTMLVideoElement, guideCanvas: HTMLCanvasElem
   window.addEventListener('pageshow', () => void start(), opts);
   // StrictMode can unmount and remount before a camera permission prompt resolves.
   queueMicrotask(() => void start());
-  return () => { lifetime.abort(); stop(); };
+  return { updateLayouts, close() { lifetime.abort(); stop(); } };
 }

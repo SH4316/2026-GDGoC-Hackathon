@@ -1,9 +1,23 @@
+import { placeLabel } from './routeInstruction';
+import { chatCache } from './journeyUrl';
+import { closeOverlay, updateUrl, useQuery } from '../urlState';
+import type { Translate } from '../i18n/language';
+import { useLanguage } from '../i18n/LanguageSelect';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { currentOrigin, displayPlaceName, formatMeters, readRoute, type Journey, type Place, type RouteMode } from './routes';
+import { currentOrigin, formatMeters, readRoute, type Journey, type Place, type RouteMode } from './routes';
 import './route-chat.css';
 
 type Source = { title: string; url: string };
 type Turn = { role: 'assistant' | 'user'; content: string; journey?: Journey; sources?: Source[] };
+type SavedChat = { route: string; turns: Turn[]; draft: string; gps?: Place };
+
+function savedChat(route: string): SavedChat | undefined {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(chatCache) ?? 'null');
+    if (saved?.route === route && Array.isArray(saved.turns) && typeof saved.draft === 'string') return saved;
+  } catch { /* Chat also works with storage disabled. */ }
+}
+
 type Reply = {
   message: string; sources: Source[];
   proposal?: { origin: Place; destination: Place; mode: RouteMode; data: Parameters<typeof readRoute>[0] };
@@ -48,38 +62,53 @@ function SoundWave() {
   </svg>;
 }
 
-function proposalSummary(trip: Journey) {
-  return [trip.mode === 'walk' ? '도보' : '대중교통',
-    trip.seconds !== undefined && '약 ' + Math.max(1, Math.round(trip.seconds / 60)) + '분',
-    trip.meters !== undefined && formatMeters(trip.meters)].filter(Boolean).join(' · ');
+function proposalSummary(trip: Journey, t: Translate, locale: string) {
+  return [t(trip.mode === 'walk' ? '도보' : '대중교통'),
+    trip.seconds !== undefined && t('약 {minutes}분', { minutes: Math.max(1, Math.round(trip.seconds / 60)) }),
+    trip.meters !== undefined && formatMeters(trip.meters, locale)].filter(Boolean).join(' · ');
 }
 
 function RouteOffer({ trip, accept }: { trip: Journey; accept: (trip: Journey) => void }) {
-  return <article className="chat-offer" aria-label="제안된 경로">
-    <div className="chat-offer-title"><strong>경로 제안</strong><span>{trip.provider === 'tmap' ? 'TMAP' : '카카오맵'}</span></div>
+  const { t, locale, language } = useLanguage();
+  return <article className="chat-offer" aria-label={t('제안된 경로')}>
+    <div className="chat-offer-title"><strong>{t('경로 제안')}</strong><span>{trip.provider === 'tmap' ? 'TMAP' : t('카카오맵')}</span></div>
     <dl>{([['출발', trip.origin], ['도착', trip.destination]] as const).map(([label, place]) =>
-      <div key={label}><dt>{label}</dt><dd>{displayPlaceName(place.name)}{place.detail && <small>{place.detail}</small>}</dd></div>)}</dl>
-    <p>{proposalSummary(trip)}</p>
-    <button type="button" onClick={() => accept(trip)}>수락하고 길 안내 시작 <Icon name="arrow" size={18}/></button>
+      <div key={label}><dt>{t(label)}</dt><dd>{placeLabel(place.name, language)}{place.detail && <small>{place.detail}</small>}</dd></div>)}</dl>
+    <p>{proposalSummary(trip, t, locale)}</p>
+    <button type="button" onClick={() => accept(trip)}>{t('수락하고 길 안내 시작')} <Icon name="arrow" size={18}/></button>
   </article>;
 }
 
 export function RouteChat({ origin, destination, mode, disabled, accept }: {
   origin?: Place; destination?: Place; mode: RouteMode; disabled: boolean; accept: (trip: Journey) => void;
 }) {
+  const { t, language, locale } = useLanguage();
+  const query = useQuery();
+  const open = query.get('dialog') === 'chat' && query.get('view') !== 'indoor';
   const dialog = useRef<HTMLDialogElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const log = useRef<HTMLDivElement>(null);
   const recognition = useRef<Speech | null>(null);
   const request = useRef<AbortController | null>(null);
   const locationRequest = useRef(0);
-  const [turns, setTurns] = useState<Turn[]>([]);
-  const [draft, setDraft] = useState('');
+  const route = JSON.stringify([origin?.point, destination?.point, mode]);
+  const [saved] = useState(() => savedChat(route));
+  const [turns, setTurns] = useState<Turn[]>(saved?.turns ?? []);
+  const [draft, setDraft] = useState(saved?.draft ?? '');
   const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
   const [listening, setListening] = useState(false);
   const [locating, setLocating] = useState(false);
-  const [gps, setGps] = useState<Place>();
+  const [gps, setGps] = useState<Place | undefined>(saved?.gps);
+  useEffect(() => {
+    if (!open) return;
+    // Keep the transcript in this tab. A copied URL contains only the dialog and route settings.
+    const last = turns.at(-1);
+    const interrupted = pending && last?.role === 'user';
+    const snapshot: SavedChat = { route, turns: interrupted ? turns.slice(0, -1) : turns,
+      draft: interrupted ? last.content : draft, gps };
+    try { sessionStorage.setItem(chatCache, JSON.stringify(snapshot)); } catch { /* Storage is optional. */ }
+  }, [open, route, turns, draft, pending, gps]);
   useEffect(() => () => {
     request.current?.abort();
     locationRequest.current++;
@@ -87,6 +116,12 @@ export function RouteChat({ origin, destination, mode, disabled, accept }: {
     recognition.current = null;
   }, []);
   useEffect(() => { if (log.current) log.current.scrollTop = log.current.scrollHeight; }, [turns, pending, error]);
+
+  useEffect(() => {
+    const element = dialog.current!;
+    if (open && !element.open) element.showModal();
+    if (!open && element.open) element.close();
+  }, [open]);
 
   function stopSpeech() {
     const speech = recognition.current;
@@ -103,7 +138,7 @@ export function RouteChat({ origin, destination, mode, disabled, accept }: {
       const place = await currentOrigin();
       if (version === locationRequest.current) setGps(place);
     } catch (e) {
-      if (version === locationRequest.current) setError((e instanceof Error ? e.message : '위치를 확인하지 못했습니다.') + ' 출발지 이름을 입력해 주세요.');
+      if (version === locationRequest.current) setError(t(e instanceof Error ? e.message : '위치를 확인하지 못했습니다.') + ' ' + t('출발지 이름을 입력해 주세요.'));
     } finally { if (version === locationRequest.current) setLocating(false); }
   }
 
@@ -114,7 +149,7 @@ export function RouteChat({ origin, destination, mode, disabled, accept }: {
     const speech = new Recognition();
     recognition.current = speech;
     const initial = draft.trimEnd();
-    speech.lang = 'ko-KR'; speech.interimResults = true;
+    speech.lang = locale; speech.interimResults = true;
     speech.onresult = event => {
       if (recognition.current !== speech) return;
       const words = Array.from(event.results, result => result[0].transcript).join(' ');
@@ -144,8 +179,8 @@ export function RouteChat({ origin, destination, mode, disabled, accept }: {
         method: 'POST', signal: controller.signal, headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: next.slice(-17).map(turn => ({
           role: turn.role, content: turn.journey ? [turn.journey.origin.name, turn.journey.destination.name,
-            proposalSummary(turn.journey)].join(' → ') : turn.content,
-        })), origin: gps ?? origin, destination, mode,
+            proposalSummary(turn.journey, t, locale)].join(' → ') : turn.content,
+        })), origin: gps ?? origin, destination, mode, language,
         previous: previous && { origin: previous.origin, destination: previous.destination, mode: previous.mode } }),
       });
       if (!response.ok) {
@@ -171,47 +206,47 @@ export function RouteChat({ origin, destination, mode, disabled, accept }: {
 
   return <>
     <button type="button" disabled={disabled} className="chat-launcher" aria-haspopup="dialog"
-      onClick={() => dialog.current?.showModal()}><Icon name="mic" size={19}/> 경로 대화</button>
-    <dialog ref={dialog} className="route-chat" aria-labelledby="route-chat-title" onClose={() => {
+      onClick={() => updateUrl({ dialog: 'chat' }, 'push')}><Icon name="mic" size={19}/> {t('경로 대화')}</button>
+    <dialog ref={dialog} className="route-chat" aria-labelledby="route-chat-title" onCancel={event => { event.preventDefault(); closeOverlay({ dialog: null }); }} onClose={() => {
       stopSpeech(); locationRequest.current++; setLocating(false);
     }}>
       <div className="chat-frame">
-        <header className="chat-header"><h2 id="route-chat-title" tabIndex={-1} autoFocus><Icon name="wave"/>경로 대화</h2>
-          <button type="button" className="chat-icon" aria-label="대화 닫기" onClick={() => dialog.current?.close()}><Icon name="close"/></button>
+        <header className="chat-header"><h2 id="route-chat-title" tabIndex={-1} autoFocus><Icon name="wave"/>{t('경로 대화')}</h2>
+          <button type="button" className="chat-icon" aria-label={t('대화 닫기')} onClick={() => closeOverlay({ dialog: null })}><Icon name="close"/></button>
         </header>
         <div className="chat-history" ref={log}>
           {!turns.length && <div className="chat-welcome" data-listening={listening}>
-            <SoundWave/><h3>어디로 갈까요?</h3><p>출발지와 도착지를 말하거나 입력해 주세요.</p>
+            <SoundWave/><h3>{t('어디로 갈까요?')}</h3><p>{t('출발지와 도착지를 말하거나 입력해 주세요.')}</p>
           </div>}
-          <div role="log" aria-label="경로 대화 내역" aria-live="polite" aria-relevant="additions">
+          <div role="log" aria-label={t('경로 대화 내역')} aria-live="polite" aria-relevant="additions">
             {turns.map((turn, index) => <div className={'chat-turn ' + turn.role} key={index}>
-              {turn.content && <p><span className="route-announcement">{turn.role === 'user' ? '나' : '경로 도우미'}. </span>{turn.content}</p>}
-              {turn.journey && <RouteOffer trip={turn.journey} accept={trip => { dialog.current?.close(); accept(trip); }}/>}
-              {!!turn.sources?.length && <ul className="chat-sources" aria-label="검색 출처">
+              {turn.content && <p><span className="route-announcement">{turn.role === 'user' ? t('나') : t('경로 도우미')}. </span>{turn.content}</p>}
+              {turn.journey && <RouteOffer trip={turn.journey} accept={accept}/>}
+              {!!turn.sources?.length && <ul className="chat-sources" aria-label={t('검색 출처')}>
                 {turn.sources.map(source => <li key={source.url}><a href={source.url} target="_blank" rel="noreferrer">{source.title} ↗</a></li>)}
               </ul>}
             </div>)}
           </div>
-          {pending && <p className="chat-progress" role="status"><Icon name="wave" size={16}/> 응답을 기다리는 중…</p>}
+          {pending && <p className="chat-progress" role="status"><Icon name="wave" size={16}/> {t('응답을 기다리는 중…')}</p>}
         </div>
         <form className="chat-composer" onSubmit={send}>
-          {error && <p className="chat-error" role="alert">{error}</p>}
+          {error && <p className="chat-error" role="alert">{t(error)}</p>}
           <div className="chat-options">
             <button type="button" className="chat-location" aria-pressed={!!gps} disabled={locating || pending}
-              onClick={() => void locate()}><Icon name="location" size={16}/>{locating ? '위치 확인 중…' : gps ? '현재 위치 사용 중' : '현재 위치 사용'}</button>
-            {listening && <span role="status">듣고 있어요…</span>}
+              onClick={() => void locate()}><Icon name="location" size={16}/>{locating ? t('위치 확인 중…') : gps ? t('현재 위치 사용 중') : t('현재 위치 사용')}</button>
+            {listening && <span role="status">{t('듣고 있어요…')}</span>}
           </div>
           <div className="chat-entry">
-            <button type="button" className="chat-icon chat-dictate" disabled={pending} aria-label={listening ? '음성 입력 마치기' : '음성 입력'}
-              title={listening ? '음성 입력 마치기' : '음성 입력'} aria-pressed={listening} onClick={dictate}><Icon name={listening ? 'stop' : 'mic'}/></button>
-            <textarea ref={input} rows={1} aria-label="경로 메시지" placeholder="메시지 입력" maxLength={2000}
+            <button type="button" className="chat-icon chat-dictate" disabled={pending} aria-label={listening ? t('음성 입력 마치기') : t('음성 입력')}
+              title={listening ? t('음성 입력 마치기') : t('음성 입력')} aria-pressed={listening} onClick={dictate}><Icon name={listening ? 'stop' : 'mic'}/></button>
+            <textarea ref={input} rows={1} aria-label={t('경로 메시지')} placeholder={t('메시지 입력')} maxLength={2000}
               value={draft} readOnly={listening || pending} onChange={event => setDraft(event.target.value)}
               onKeyDown={event => {
                 if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229) {
                   event.preventDefault(); event.currentTarget.form?.requestSubmit();
                 }
               }}/>
-            <button type="submit" className="chat-icon chat-send" disabled={!draft.trim() || pending || locating || listening} aria-label="메시지 보내기">
+            <button type="submit" className="chat-icon chat-send" disabled={!draft.trim() || pending || locating || listening} aria-label={t('메시지 보내기')}>
               <Icon name="send"/></button>
           </div>
         </form>

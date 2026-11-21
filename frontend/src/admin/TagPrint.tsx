@@ -1,3 +1,5 @@
+import { updateUrl, useQuery } from '../urlState';
+import { LanguageSelect, useLanguage } from '../i18n/LanguageSelect';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import atlasUrl from './tag36h11.png';
 import './tag-print.css';
@@ -41,6 +43,7 @@ const paperSizes = [
 const cssPixelsPerMm = 96 / 25.4;
 
 export function TagPrint({ ids, sideM, needsSave, close }: { ids: number[]; sideM: number; needsSave: boolean; close: () => void }) {
+  const { t, locale } = useLanguage();
   const [atlas, setAtlas] = useState<ImageData>();
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -51,7 +54,8 @@ export function TagPrint({ ids, sideM, needsSave, close }: { ids: number[]; side
   const back = useRef<HTMLButtonElement>(null);
   const pages = useRef<HTMLDivElement>(null);
   const currentPage = useRef(0);
-  const [fitScreen, setFitScreen] = useState(true);
+  const fitScreen = useQuery().get('scale') !== 'print';
+  const setFitScreen = (fit: boolean) => updateUrl({ scale: fit ? null : 'print' });
   const [area, setArea] = useState<{ width: number; height: number }>();
   const side = sideM * 1000;
   const withMargin = side * 1.25 + 10;
@@ -137,37 +141,38 @@ export function TagPrint({ ids, sideM, needsSave, close }: { ids: number[]; side
       @media print { .tag-sheet { width: ${paper.w}mm; height: ${paper.h - 2}mm; } }`}</style>
     <header className="tag-print-tools">
       <div>
-        <button type="button" className="admin-text-button" ref={back} onClick={close}>공간 관리로 돌아가기</button>
-        <h1>AprilTag 인쇄</h1>
-        <p>{paper.name} ({paper.w} × {paper.h} mm) · {ids.length}장 · 인쇄 배율을 실제 크기(100%)로 설정하세요.</p>
-        {needsSave && <p>설치하기 전에 배치를 저장해 이 공간의 태그 번호를 확정하세요.</p>}
+        <button type="button" className="admin-text-button" ref={back} onClick={close}>{t('공간 관리로 돌아가기')}</button>
+        <h1>{t('AprilTag 인쇄')}</h1>
+        <p>{t(paper.name)} ({paper.w} × {paper.h} mm) · {t('{count}장 · 인쇄 배율을 실제 크기(100%)로 설정하세요.', { count: ids.length })}</p>
+        {needsSave && <p>{t('설치하기 전에 배치를 저장해 이 공간의 태그 번호를 확정하세요.')}</p>}
       </div>
       <div className="tag-print-actions">
-        {pdfUrl ? <a className="admin-button" href={pdfUrl} download={filename}>PDF 다운로드</a>
+        <LanguageSelect />
+        {pdfUrl ? <a className="admin-button" href={pdfUrl} download={filename}>{t('PDF 다운로드')}</a>
           : <button type="button" className="admin-button" disabled={!pdfFailed}
-              onClick={() => setPdfAttempt(n => n + 1)}>{pdfFailed ? 'PDF 다시 준비' : 'PDF 준비 중…'}</button>}
-        <button type="button" className="admin-button admin-primary" disabled={!atlas} onClick={() => window.print()}>인쇄</button>
+              onClick={() => setPdfAttempt(n => n + 1)}>{pdfFailed ? t('PDF 다시 준비') : t('PDF 준비 중…')}</button>}
+        <button type="button" className="admin-button admin-primary" disabled={!atlas} onClick={() => window.print()}>{t('인쇄')}</button>
       </div>
     </header>
-    {pdfFailed && <p className="tag-print-status" role="alert">PDF 파일을 만들지 못했습니다. 다시 시도하세요.</p>}
-    {!atlas && <p className="tag-print-status" role="status">{failed ? '인쇄 도안을 불러오지 못했습니다.' : '인쇄 도안 생성 중…'}
-      {failed && <button type="button" className="admin-button" onClick={() => setAttempt(n => n + 1)}>다시 시도</button>}
+    {pdfFailed && <p className="tag-print-status" role="alert">{t('PDF 파일을 만들지 못했습니다. 다시 시도하세요.')}</p>}
+    {!atlas && <p className="tag-print-status" role="status">{failed ? t('인쇄 도안을 불러오지 못했습니다.') : t('인쇄 도안 생성 중…')}
+      {failed && <button type="button" className="admin-button" onClick={() => setAttempt(n => n + 1)}>{t('다시 시도')}</button>}
     </p>}
     <div className="tag-preview-options">
-      <div role="group" aria-label="미리보기 배율" className="admin-view-switch">
-        <button type="button" aria-pressed={fitScreen} onClick={() => setFitScreen(true)}>자동 맞춤</button>
-        <button type="button" aria-pressed={!fitScreen} onClick={() => setFitScreen(false)}>인쇄 기준 100%</button>
+      <div role="group" aria-label={t('미리보기 배율')} className="admin-view-switch">
+        <button type="button" aria-pressed={fitScreen} onClick={() => setFitScreen(true)}>{t('자동 맞춤')}</button>
+        <button type="button" aria-pressed={!fitScreen} onClick={() => setFitScreen(false)}>{t('인쇄 기준 100%')}</button>
       </div>
-      <span aria-live="polite">표시 배율 {Math.round(screenScale * 100)}%</span>
-      <small>화면의 mm는 모니터에 따라 실측 길이와 차이가 날 수 있습니다.</small>
+      <span aria-live="polite">{t('표시 배율')} {Math.round(screenScale * 100)}%</span>
+      <small>{t('화면의 mm는 모니터에 따라 실측 길이와 차이가 날 수 있습니다.')}</small>
     </div>
-    <div className="tag-preview-pages" ref={pages} style={screenStyle} onScroll={rememberPage} role="region" aria-label="태그 용지 미리보기" tabIndex={0}>
-    {sheets.map(({ id, path }) => <svg key={id} className="tag-sheet" role="img" aria-label={'인쇄용 AprilTag ID ' + id}
+    <div className="tag-preview-pages" ref={pages} style={screenStyle} onScroll={rememberPage} role="region" aria-label={t('태그 용지 미리보기')} tabIndex={0}>
+    {sheets.map(({ id, path }) => <svg key={id} className="tag-sheet" role="img" aria-label={t('인쇄용 AprilTag ID {id}', { id })}
       width={paper.w + 'mm'} height={paper.h - 2 + 'mm'} viewBox={`0 0 ${paper.w} ${paper.h - 2}`}>
       <rect width={paper.w} height={paper.h} fill="white" />
       <g textAnchor="middle" fill="black">
         <text x={paper.w / 2} y={16} fontSize="7" fontWeight="700">AprilTag · ID {id}</text>
-        <text x={paper.w / 2} y={24} fontSize="3.8">tag36h11 · 검은 테두리 한 변 {side.toLocaleString('ko-KR', { maximumFractionDigits: 4 })} mm</text>
+        <text x={paper.w / 2} y={24} fontSize="3.8">{t('tag36h11 · 검은 테두리 한 변')} {side.toLocaleString(locale, { maximumFractionDigits: 4 })} mm</text>
         <text x={paper.w / 2} y={(paper.h - side * 1.25) / 2 - 4} fontSize="4">↑ UP</text>
       </g>
       <g transform={`translate(${(paper.w - side) / 2} ${(paper.h - side) / 2}) scale(${side / 8})`}>

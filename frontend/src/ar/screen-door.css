@@ -1,0 +1,102 @@
+.camera-screen[data-indoor="true"][data-screen-door="true"] {
+  grid-template: minmax(0, 1fr) auto / minmax(0, 1fr);
+}
+.camera-screen[data-indoor="true"][data-screen-door="true"] .passage-stage,
+.door-still { grid-area: 1 / 1; }
+.camera-screen[data-indoor="true"][data-screen-door="true"] :is(.camera-controls, .camera-dock) {
+  display: none;
+}
+.camera-screen[data-screen-door="true"] .passage-stage canvas { visibility: hidden; }
+.door-still {
+  min-height: 0;
+  z-index: 2;
+  background: #101815;
+}
+.door-still img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.door-panel {
+  grid-area: 2 / 1;
+  box-sizing: border-box;
+  max-height: 62dvh;
+  overflow: auto;
+  padding: 16px max(16px, env(safe-area-inset-right)) max(4px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  border-top: 1px solid #52615a;
+  background: #172820;
+  color: #f5f7f6;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+.door-content { max-width: 42rem; margin-inline: auto; }
+.door-intro { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.door-panel h1 { margin: 0; font-size: 21px; line-height: 1.35; text-wrap: balance; }
+.door-panel h1:focus { outline: none; }
+.door-panel h1[data-verdict="match"] { color: #a6edc7; }
+.door-panel h1[data-verdict="mismatch"] { color: #ffcf87; }
+.door-panel p { margin: 6px 0 0; color: #d5e9df; font-size: 14px; line-height: 1.5; }
+.door-panel .door-route { color: #b7dfc9; }
+.door-panel button, .door-example-dialog button {
+  min-height: 44px;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.door-panel :is(button, input):focus-visible, .door-example-dialog button:focus-visible {
+  outline: 3px solid #a6edc7; outline-offset: 2px;
+}
+.door-example {
+  flex: none;
+  position: relative;
+  width: min(30%, 126px);
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #82978a;
+  border-radius: 8px;
+  background: #17201c;
+}
+.door-example img { display: block; width: 100%; height: auto; }
+.door-example span {
+  display: flex; gap: 5px; align-items: center; justify-content: center;
+  padding: 4px; font-size: 12px; font-weight: 600;
+}
+.door-example svg { width: 13px; height: 13px; stroke: currentColor; stroke-width: 1.5; }
+.door-inputs { display: flex; gap: 10px; margin-top: 10px; }
+.door-inputs label { display: grid; flex: 1; min-width: 0; gap: 4px; font-size: 13px; }
+.door-inputs input {
+  box-sizing: border-box; min-height: 44px; width: 100%; padding: 0 10px; font: inherit; font-size: 16px;
+  border-radius: 7px; border: 1px solid #879c8f; color: #f5f7f6; background: #101c16;
+}
+.door-panel .door-shutter {
+  display: flex; justify-content: center; align-items: center; gap: 9px;
+  width: 100%; min-height: 52px; margin-top: 14px; border: 0; border-radius: 12px;
+  background: #a6edc7; color: #15251f; font-weight: 700;
+}
+.door-shutter svg { width: 23px; height: 23px; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
+.door-panel .door-shutter:hover:enabled { background: #c1f6da; }
+.door-panel .door-shutter:active:enabled { background: #8cd8b0; }
+.door-panel .door-shutter:disabled { background: #3b5648; color: #e3ede7; cursor: wait; }
+.door-navigation { display: flex; justify-content: space-between; gap: 8px; margin-top: 2px; }
+.door-navigation button {
+  padding: 4px; border: 0; background: transparent; font-size: 14px; color: #d5e9df;
+}
+.door-navigation button:hover, .door-navigation button:focus-visible { text-decoration: underline; }
+.door-example-dialog {
+  box-sizing: border-box; width: min(46rem, calc(100vw - 24px)); max-height: 92dvh; padding: 12px;
+  color: #f5f7f6; background: #172820; border: 1px solid #82978a; border-radius: 12px;
+}
+.door-example-dialog::backdrop { background: rgb(5 13 9 / 85%); }
+.door-example-dialog form { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+.door-example-dialog h2 { margin: 0; font-size: 18px; }
+.door-example-dialog button { padding: 0 12px; border: 1px solid #82978a; border-radius: 8px; background: #17201c; }
+.door-example-dialog img { display: block; width: 100%; height: auto; max-height: 72dvh; object-fit: contain; }
+@media (min-width: 900px), (orientation: landscape) and (max-height: 560px) {
+  .camera-screen[data-indoor="true"][data-screen-door="true"] {
+    grid-template: minmax(0, 1fr) / minmax(0, 1fr) clamp(280px, 38vw, 420px);
+  }
+  .door-panel {
+    grid-area: 1 / 2; max-height: 100%; border: 0; border-left: 1px solid #52615a;
+    padding-block: max(16px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-bottom));
+  }
+  .door-content { display: flex; flex-direction: column; min-height: 100%; }
+  .door-capture-form { flex: 1; display: flex; flex-direction: column; }
+  .door-panel .door-shutter { margin-top: auto; }
+  .door-intro, .door-panel .door-route, .door-inputs { margin-bottom: 12px; }
+}

@@ -23,6 +23,7 @@ test('predicts from each measured camera position and replays motion newer than 
   t.correct('a', fix(2, 7), 100, 0);
   for (let time = 150; time <= 1000; time += 50) t.motion(sample(time, [1, 0, 0]));
   assert.equal(t.pose(1000, false).source, 'motion');
+  assert.equal(t.walkingObservation(1000), undefined, 'acceleration without confirmed steps cannot announce turns');
   near(t.pose(1000, false).point[0], 2.405); // 1/2 * 1 m/s² * .9 s²
   near(t.pose(1000, false).point[1], 7);
   t.correct('a', fix(5, 8), 900, 0);
@@ -54,6 +55,23 @@ test('closely spaced tag fixes preserve walking velocity at the exposure time', 
   assert.equal(t.pose(1100, false).source, 'last');
 });
 
+test('matched floor images keep their own anchor until motion samples can resume fusion', async () => {
+  const t = await tracker();
+  t.correct('a', fix(0, 0), 0, 0);
+  for (let time = 150; time <= 1500; time += 150) {
+    const anchor = t.floorAnchor(time);
+    assert.deepEqual(anchor, { spaceId: 'a', timeMs: time - 150 });
+    assert.equal(t.correct('a', { ...fix(0, time / 1000), referenceTimeMs: anchor.timeMs }, time, 0, 'floor'), false);
+    assert.equal(t.pose(time, false).source, 'last');
+  }
+  t.motion(sample(1600, [0, 0, 0]));
+  assert.equal(t.correct('a', { ...fix(0, 2), referenceTimeMs: 0 }, 1650, 0, 'floor'), undefined);
+  assert.equal(t.correct('b', { ...fix(0, 2), referenceTimeMs: 1500 }, 1650, 0, 'floor'), undefined);
+  assert.equal(t.correct('a', { ...fix(0, 2), referenceTimeMs: 1500 }, 1650, 0, 'floor'), true);
+  assert.deepEqual(t.pose(1650, false).point, [0, 2]);
+  assert.equal(t.floorAnchor(3000), undefined);
+});
+
 test('maps landscape and subsequent handset rotation into floor coordinates', async () => {
   const t = await tracker();
   t.correct('a', fix(0, 0), 0, 90);
@@ -66,6 +84,179 @@ test('maps landscape and subsequent handset rotation into floor coordinates', as
   for (let time = 1650; time <= 2000; time += 50) t.motion(sample(time, [2, 0, 0]));
   near(t.pose(2000, false).point[0], 0);
   near(t.pose(2000, false).point[1], .16);
+});
+
+test('corridor yaw steers navigation while exposure samples keep the raw camera axes', async () => {
+  for (const angle of [0, 90, 180, 270]) {
+    const t = await tracker();
+    const raw = fix(0, 0);
+    t.correct('a', raw, 0, angle, 'tag', [], 7);
+    near(t.pose(0, true).headingDeg, 7);
+    t.motion(sample(20, [0, 0, 0], [0, 0, 0]));
+    const shot = t.corridorCamera(25, angle);
+    near(shot.headingDeg, 0);
+    shot.up.forEach((v,i) => near(v, [0, -1, 0][i]));
+    assert.deepEqual(shot.point, [0, 0]);
+    t.correctHeading('a', -5, 25);
+    t.correctHeading('a', -5, 30);
+    t.correctHeading('a', 8, 24);
+    t.correctHeading('other', 9, 35);
+    near(t.pose(30, false).headingDeg, -5);
+
+    t.motion(sample(50, [0, 0, 0], [0, 160, 0]));
+    near(t.corridorCamera(40, angle).headingDeg, 0); // The image preceded the rotation.
+    assert.equal(t.corridorCamera(120, angle), undefined);
+    t.correct('a', raw, 150, angle);
+    near(t.pose(150, true).headingDeg, 0);
+    assert.equal(t.corridorCamera(155, angle), undefined);
+    assert.deepEqual(raw, fix(0, 0));
+  }
+});
+
+test('gyro-only turns keep the guide aligned after a long stationary tag outage in every display orientation', async () => {
+  const { readMotion } = await import('../src/ar/motion.ts');
+  try {
+    for (const angle of [0, 90, 180, 270]) {
+      const t = await tracker();
+      global.screen = { orientation: { angle } };
+      t.correct('hall', fix(4, 7), 100, angle, 'tag', undefined, 8);
+      const rad = angle * Math.PI / 180;
+      for (let at = 120; at <= 31100; at += 20) {
+        const rate = at <= 30100 ? 0 : -90;
+        // DeviceMotion rotationRate reports physical X, Y, Z rates as alpha, beta, gamma.
+        t.motion(readMotion({ timeStamp: at, rotationRate: { alpha: Math.sin(rad) * rate, beta: Math.cos(rad) * rate, gamma: 0 } }));
+      }
+      const shot = t.guideCamera(31105, angle);
+      assert.equal(shot.spaceId, 'hall');
+      assert.equal(shot.referenceTimeMs, 100);
+      const m = shot.cameraToWorld;
+      near(Math.atan2(m[2], m[6]) * 180 / Math.PI, 98); // Corridor calibration is applied once.
+      assert.deepEqual([m[3], m[7], m[11]], [4, 7, 1.5]);
+      assert.equal(t.pose(31105, false).source, 'last');
+      near(t.pose(31105, false).headingDeg, 98);
+      assert.equal(t.walkingObservation(31105), undefined);
+      assert.equal(t.floorAnchor(31105), undefined);
+      assert.equal(t.corridorCamera(31105, angle), undefined);
+      t.motion(sample(31110, [0, 0, 0]));
+      assert.deepEqual(t.guideCamera(31115, angle), shot);
+      const rotatedDisplay = t.guideCamera(31105, angle + 90).cameraToWorld;
+      for (const axis of [0,4,8]) {
+        near(rotatedDisplay[axis + 2], m[axis + 2]);
+        near(rotatedDisplay[axis], m[axis + 1]);
+      }
+    }
+  } finally { delete global.screen; }
+});
+
+test('visual-only floor poses replay delayed gyro samples and rotation resumes after a gap', async () => {
+  const t = await tracker();
+  const downward = { position: [2, 3, 1.2], cameraToWorld: [1,0,0,2, 0,-1,0,3, 0,0,-1,1.2, 0,0,0,1] };
+  t.correct('hall', fix(0, 0), 0, 0);
+  for (let at = 20; at <= 1000; at += 20) t.motion(sample(at, null, [0, 0, -90]));
+  assert.equal(t.correct('hall', { ...downward, referenceTimeMs: 0 }, 200, 0, 'floor'), false);
+  const shot = t.guideCamera(1000, 0);
+  assert.equal(shot.referenceTimeMs, 200);
+  const m = shot.cameraToWorld;
+  near(Math.atan2(m[4], m[0]) * 180 / Math.PI, -72);
+  near(m[10], -1);
+  assert.deepEqual([m[3], m[7], m[11]], [2, 3, 1.2]);
+  assert.equal(t.guideCamera(1400, 0), undefined);
+  t.motion(sample(1500, null, [0, 0, 90]));
+  assert.equal(t.guideCamera(1500, 0), undefined);
+  t.motion(sample(1520, null, [0, 0, 90]));
+  const resumed = t.guideCamera(1520, 0).cameraToWorld;
+  near(Math.atan2(resumed[4], resumed[0]) * 180 / Math.PI, -72 + 1.8);
+  assert.deepEqual([resumed[3], resumed[7], resumed[11]], [2, 3, 1.2]);
+  t.correct('other', fix(9, 8), 1550, 0);
+  t.motion(sample(1570, null, [0, 0, 0]));
+  assert.equal(t.guideCamera(1570, 0).spaceId, 'other');
+  t.suspend();
+  t.motion(sample(1580, null, [0, 90, 0]));
+  t.motion(sample(1600, null, [0, 90, 0]));
+  assert.equal(t.guideCamera(1600, 0), undefined);
+});
+
+test('gravity restores guide pitch and roll after a missed tilt while keeping the anchored bearing and position', async () => {
+  const rad = Math.PI / 180;
+  const pitch = 40 * rad, roll = 24 * rad;
+  const actualUp = [Math.sin(roll)*Math.cos(pitch), -Math.cos(roll)*Math.cos(pitch), Math.sin(pitch)];
+  for (const angle of [0, 90, 180, 270]) for (const polarity of [-1, 1]) {
+    const t = await tracker();
+    const c = Math.cos(angle*rad), s = Math.sin(angle*rad);
+    function send(time, cameraUp, acceleration, rotation = [0, 0, 0]) {
+      const [x,y,z] = cameraUp;
+      const deviceUp = [c*x - s*y, -s*x - c*y, -z];
+      const total = deviceUp.map((g, i) => polarity*9.81*g + acceleration[i]);
+      t.motion(sample(time, acceleration, rotation, total));
+    }
+    send(10, [0,-1,0], [0,0,0]);
+    assert.equal(t.floorUp(10, angle), undefined); // Polarity has no visual reference yet.
+    t.correct('hall', fix(2,3), 20, angle, 'tag', undefined, 18);
+    assert.ok(t.floorUp(20, angle)); // The acceleration sample preceded the tag exposure.
+    send(40, [0,-1,0], [0,0,0]);
+    // The handset tilted during a gyro outage and is now braking horizontally.
+    send(1420, actualUp, [3,-1,2]);
+    send(1440, actualUp, [3,-1,2]);
+    const m = t.guideCamera(1440, angle).cameraToWorld;
+    const up = t.floorUp(1440, angle);
+    for (let i = 0; i < 3; i++) { near(up[i], actualUp[i]); near(m[8+i], actualUp[i]); }
+    near(Math.atan2(m[2], m[6])/rad, 18);
+    assert.deepEqual([m[3], m[7], m[11]], [2,3,1.5]);
+    assert.equal(t.floorUp(1600, angle), undefined);
+    t.motion(sample(1650, null, [0,0,0], [3,8,-2])); // Cannot separate gravity from translation.
+    assert.equal(t.floorUp(1650, angle), undefined);
+    const held = t.guideCamera(1650, angle).cameraToWorld;
+    for (let i = 0; i < 3; i++) near(held[8+i], actualUp[i]);
+    t.suspend();
+    assert.equal(t.floorUp(1440, angle), undefined);
+  }
+});
+
+test('late gyro permission starts tracking from the last known orientation in an anchored session', async () => {
+  const t = await tracker();
+  t.correct('a', fix(1, 2), 0, 0);
+  for (let time = 10000; time <= 11000; time += 50) t.motion(sample(time, null, [0, -90, 0]));
+  const camera = t.guideCamera(11000, 0);
+  near(Math.atan2(camera.cameraToWorld[2], camera.cameraToWorld[6]) * 180 / Math.PI, 90);
+  assert.equal(camera.referenceTimeMs, 0);
+  const pose = t.pose(11000, false);
+  assert.equal(pose.source, 'last');
+  assert.deepEqual(pose.point, [1, 2]);
+  near(pose.headingDeg, 90);
+  assert.equal(t.pose(11400, false).headingDeg, null);
+});
+
+test('indoor guidance and a simultaneous motion permission request share the tap prompt', async () => {
+  const { motionAccess, requestMotionAccess } = await import('../src/ar/motion.ts');
+  let prompts = 0;
+  const permission = Promise.withResolvers();
+  global.window = { DeviceMotionEvent: { requestPermission() { prompts++; return permission.promise; } } };
+  try {
+    const first = requestMotionAccess(), second = requestMotionAccess();
+    assert.equal(prompts, 1);
+    permission.resolve('granted');
+    assert.deepEqual(await Promise.all([first, second]), ['granted', 'granted']);
+    assert.equal(motionAccess(), 'granted');
+  } finally { delete global.window; }
+});
+
+test('step displacement uses corridor yaw once and a heading observation cannot confirm position', async () => {
+  const t = await tracker();
+  t.correct('a', fix(0, 0), 0, 0);
+  for (let time = 20; time <= 4000; time += 20) t.motion(walkingSample(time));
+  const before = t.pose(4000, false).point;
+  for (let time = 4020; time <= 8000; time += 20) {
+    t.correctHeading('a', 8, time - 1);
+    t.motion(walkingSample(time));
+  }
+  const pose = t.pose(8000, false);
+  near(pose.headingDeg, 8);
+  near(Math.atan2(pose.point[0] - before[0], pose.point[1] - before[1]) * 180 / Math.PI, 8);
+  near(t.corridorCamera(8000, 0).headingDeg, 0);
+  assert.equal(t.floorAnchor(8000), undefined);
+  t.suspend();
+  assert.equal(t.corridorCamera(8010, 0), undefined);
+  assert.equal(t.pose(8010, false).source, 'last');
 });
 
 test('handles gravity polarity, rest, unusable samples and an interrupted stream', async () => {
@@ -128,6 +319,7 @@ test('cadenced steps bridge long visual outages, turn with the handset, and stop
   const before = t.pose(6000, false);
   assert.equal(before.source, 'motion');
   assert.ok(before.point[1] > 4 && before.point[1] < 6);
+  assert.equal(t.walkingObservation(6000).headingDeg, 0);
   near(before.point[0], 0);
   for (let time = 6020; time <= 7000; time += 20) t.motion(walkingSample(time, -90));
   for (let time = 7020; time <= 12000; time += 20) t.motion(walkingSample(time));
@@ -136,6 +328,7 @@ test('cadenced steps bridge long visual outages, turn with the handset, and stop
   assert.equal(t.floorAnchor(12000), undefined, 'a counted step cannot re-anchor an unrelated camera image');
   for (let time = 12020; time <= 15000; time += 20) t.motion(sample(time, [0, 0, 0], null, [0, 9.81, 0]));
   assert.equal(t.pose(15000, false).source, 'last');
+  assert.equal(t.walkingObservation(15000), undefined);
   assert.deepEqual(t.pose(15000, false).point, turned.point);
   t.correct('a', fix(20, 30), 15020, 0);
   assert.deepEqual(t.pose(15020, true).point, [20, 30]);

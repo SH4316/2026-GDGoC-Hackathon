@@ -1,5 +1,9 @@
+import { closeOverlay, updateUrl, useQuery } from './urlState';
+import { useLanguage } from './i18n/LanguageSelect';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { stationName, stationResponse, stationUrl } from './ar/station';
+import { lineLabel } from './i18n/language';
+import { stationLabel } from './i18n/stationLabel';
 
 type Station = { name: string; code: string; nameRead: boolean; codeRead: boolean };
 type Result = {
@@ -72,6 +76,7 @@ async function capture(video: HTMLVideoElement, signal: AbortSignal) {
 }
 
 function LinkedSpaces({ line, code }: { line: string; code: string }) {
+  const { t } = useLanguage();
   const [spaces, setSpaces] = useState<{ id: string; name: string }[]>();
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -83,15 +88,16 @@ function LinkedSpaces({ line, code }: { line: string; code: string }) {
       .catch(() => { if (!controller.signal.aborted) setFailed(true); });
     return () => controller.abort();
   }, [line, code, attempt]);
-  if (failed) return <p>연결된 공간을 불러오지 못했습니다.{' '}
-    <button type="button" onClick={() => setAttempt(n => n + 1)}>다시 시도</button></p>;
+  if (failed) return <p>{t('연결된 공간을 불러오지 못했습니다.')}{' '}
+    <button type="button" onClick={() => setAttempt(n => n + 1)}>{t('다시 시도')}</button></p>;
   if (!spaces?.length) return null;
-  return <div><p><strong>연결된 공간</strong></p>
+  return <div><p><strong>{t('연결된 공간')}</strong></p>
     <ul>{spaces.map(space => <li key={space.id}>{space.name}</li>)}</ul></div>;
 }
 
 export function SignReader({ video }: { video: RefObject<HTMLVideoElement | null> }) {
-  const [open, setOpen] = useState(false);
+  const { t, language } = useLanguage();
+  const open = useQuery().get('dialog') === 'sign';
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -149,36 +155,37 @@ export function SignReader({ video }: { video: RefObject<HTMLVideoElement | null
   }
 
   const name = result?.current?.name;
-  const currentLabel = name && stationName(name);
-  return <section className="sign-reader" aria-label="역 안내판 인식">
+  const currentLabel = name && stationLabel(stationName(name), language, true);
+  const line = result?.line && lineLabel(result.line, language);
+  return <section className="sign-reader" aria-label={t('역 안내판 인식')}>
     <button type="button" className="sign-trigger" aria-expanded={open} aria-controls="sign-actions"
-      onClick={() => { clear(); setOpen(!open); }}>안내판 읽기</button>
+      onClick={() => { clear(); if (open) closeOverlay({ dialog: null }); else updateUrl({ dialog: 'sign' }, 'push'); }}>{t('안내판 읽기')}</button>
     {open && <div id="sign-actions" className="sign-panel">
       <div className="sign-actions">
-        <button type="button" disabled={!ready || busy} onClick={() => void read()}>카메라로 읽기</button>
-        <button type="button" disabled={busy} onClick={() => file.current?.click()}>사진 선택</button>
-        <input ref={file} hidden type="file" accept="image/jpeg,image/png" aria-label="안내판 사진"
+        <button type="button" disabled={!ready || busy} onClick={() => void read()}>{t('카메라로 읽기')}</button>
+        <button type="button" disabled={busy} onClick={() => file.current?.click()}>{t('사진 선택')}</button>
+        <input ref={file} hidden type="file" accept="image/jpeg,image/png" aria-label={t('안내판 사진')}
           onChange={e => { const selected = e.target.files?.[0]; e.target.value = ''; if (selected) void read(selected); }} />
       </div>
       <div role="status" aria-live="polite">
-        {busy && <p>안내판 읽는 중…</p>}
-        {error && <p>{error}</p>}
+        {busy && <p>{t('안내판 읽는 중…')}</p>}
+        {error && <p>{t(error)}</p>}
         {result?.status === 'pending' && <>
-          {result.current && <h2>{result.line} · {currentLabel}</h2>}
-          <p><strong>판독 보류</strong> · {reasons[result.reason]}</p>
+          {result.current && <h2>{line} · {currentLabel}</h2>}
+          <p><strong>{t('판독 보류')}</strong> · {t(reasons[result.reason] ?? '안내판을 읽지 못했습니다.')}</p>
         </>}
         {result?.status === 'recognized' && <>
-          <h2>{result.line} · {currentLabel}</h2>
-          <p className="sign-direction">안내판 표시 · <span aria-label={result.arrow === 'left' ? '왼쪽 화살표' : '오른쪽 화살표'}>
-            {result.arrow === 'left' ? '←' : '→'}</span> {result.toward} 방면</p>
+          <h2>{line} · {currentLabel}</h2>
+          <p className="sign-direction">{t('안내판 표시 ·')} <span aria-label={result.arrow === 'left' ? t('왼쪽 화살표') : t('오른쪽 화살표')}>
+            {result.arrow === 'left' ? '←' : '→'}</span> {t('{station} 방면', { station: stationLabel(result.toward, language, true) })}</p>
           <dl>{positions.map((side, i) =>
-            <div key={side}><dt>{['왼쪽 역', '현재역', '오른쪽 역'][i]}</dt>
-              <dd>{result[side].name} <span>{result[side].code}</span></dd></div>)}</dl>
+            <div key={side}><dt>{t(['왼쪽 역', '현재역', '오른쪽 역'][i])}</dt>
+              <dd>{stationLabel(result[side].name, language)} <span>{result[side].code}</span></dd></div>)}</dl>
           {positions.some(k => !result[k].nameRead) &&
-            <p className="sign-note">역번호로 확인한 역명 · {positions
-              .filter(k => !result[k].nameRead).map(k => result[k].name).join(', ')}</p>}
+            <p className="sign-note">{t('역번호로 확인한 역명 ·')} {positions
+              .filter(k => !result[k].nameRead).map(k => stationLabel(result[k].name, language)).join(', ')}</p>}
           {positions.some(k => !result[k].codeRead) &&
-            <p className="sign-note">노선표로 확인한 번호 · {positions
+            <p className="sign-note">{t('노선표로 확인한 번호 ·')} {positions
               .filter(k => !result[k].codeRead).map(k => result[k].code).join(', ')}</p>}
           <LinkedSpaces key={result.line + ':' + result.current.code} line={result.line} code={result.current.code} />
         </>}

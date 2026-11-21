@@ -117,7 +117,7 @@ export class TagModels {
   private readonly resources: Object3D[] = [this.pin];
   private readonly lifetime = new AbortController();
 
-  constructor(canvas: HTMLCanvasElement, private station: Station, private notice: (message: string) => void) {
+  constructor(canvas: HTMLCanvasElement, private station: Station, private notice: (message: string, tagId?: number) => void) {
     this.renderer = new WebGLRenderer({ canvas, alpha: true, antialias: true });
     this.renderer.setClearColor(0, 0);
     this.camera.matrixAutoUpdate = false;
@@ -152,7 +152,7 @@ export class TagModels {
       void template.then(mesh => {
         if (!this.lifetime.signal.aborted) { group.clear(); group.add(clone(mesh)); }
       }).catch(() => {
-        if (!this.lifetime.signal.aborted) this.notice('태그 ' + tag.id + ' 모델을 열 수 없어 기본 위치 핀을 표시합니다.');
+        if (!this.lifetime.signal.aborted) this.notice('태그 {id} 모델을 열 수 없어 기본 위치 핀을 표시합니다.', tag.id);
       });
     }
     return group;

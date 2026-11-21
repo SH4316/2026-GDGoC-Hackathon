@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
-const { mkdtemp, rm, writeFile } = require('node:fs/promises');
+const { createHash } = require('node:crypto');
+const { mkdtemp, readFile, rm, writeFile } = require('node:fs/promises');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const { test } = require('node:test');
@@ -28,6 +29,8 @@ test('station edits and models survive a restart; concurrent edits and invalid r
   await start();
   const initial = await fetch(base);
   const station = await initial.json(), version = initial.headers.get('etag');
+  const etag = bytes => '"' + createHash('sha256').update(bytes).digest('hex') + '"';
+  assert.equal(version, etag(await readFile(join(dir, 'station.json'))), 'unchanged layout keeps its saved revision');
   assert.deepEqual(station.tags.map(tag => tag.id), [4,5,6,3]);
   assert.deepEqual(station.route, [[0, 0], [0, 2], [1.75, 2]]);
   assert.equal(station.terrain.outline.length, 6);
@@ -181,4 +184,50 @@ test('station edits and models survive a restart; concurrent edits and invalid r
   await app.close();
   await start();
   assert.deepEqual(await (await fetch(base + '/spaces/' + graphId)).json(), graphSpace);
+
+  const tagRoute = { ...space, terrain: { name: '태그 자동 연결' },
+    tags: [[501, 0, 0], [503, 0, 3], [502, 3, 3]].map(([id, x, y]) => ({ id, center: [x, y], yawDeg: 0 })) };
+  tagRoute.route = tagRoute.tags.map(t => t.center);
+  const automatic = await (await createSpace(tagRoute)).json();
+  assert.deepEqual(automatic.station.autoRoute, { startTag: 501, endTag: 502 });
+  const url = base + '/spaces/' + automatic.id;
+  const editAuto = body => fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const moved = { ...tagRoute, tags: [{ ...tagRoute.tags[2], center: [4, 3] }, ...tagRoute.tags.slice(0, 2),
+    { id: 504, center: [2, 3], yawDeg: 0 }] };
+  assert.deepEqual((await (await editAuto(moved)).json()).autoRoute, automatic.station.autoRoute);
+  const swapped = { ...moved, autoRoute: { startTag: 504, endTag: 501 } };
+  assert.equal((await editAuto(swapped)).status, 200);
+  assert.equal((await editAuto({ ...swapped, autoRoute: { startTag: 501, endTag: 501 } })).status, 400);
+  assert.equal((await editAuto({ ...swapped, autoRoute: { endTag: 505 } })).status, 400);
+  await app.close();
+  await start();
+  assert.deepEqual((await (await fetch(base + '/spaces/' + automatic.id)).json()).autoRoute, swapped.autoRoute);
+
+  const underside = { heightM: 0, right: [-1, 0, 0], up: [0, 1, 0] };
+  const markers = [
+    { id: 102, center: [-5.14, 5.67], yawDeg: 180, surface: underside },
+    { id: 129, center: [6.08, 11.49], yawDeg: -90, surface: { ...underside, heightM: -1e-15 } },
+    { id: 143, center: [.70, 11.53], yawDeg: 0, surface: underside },
+  ];
+  const wall = { id: 144, center: [4, 1], yawDeg: 90, surface: { ...underside, up: [0, 0, 1] } };
+  const ceiling = { id: 145, center: [6, 1], yawDeg: 180, surface: { ...underside, heightM: 2.6 } };
+  const floorLayout = { ...space, terrain: { name: '바닥 태그' }, tags: [...markers, wall, ceiling] };
+  const expectedTags = [...markers.map(tag => ({ ...tag, surface: { ...tag.surface, right: [1, 0, 0] } })), wall, ceiling];
+  const postedFloor = await createSpace(floorLayout);
+  assert.equal(postedFloor.status, 201);
+  const floorSpace = await postedFloor.json();
+  assert.deepEqual(floorSpace.station.tags, expectedTags);
+  const floorUrl = base + '/spaces/' + floorSpace.id;
+  assert.equal((await fetch(floorUrl)).headers.get('etag'), postedFloor.headers.get('etag'));
+  // A camera already watching this specific space holds the previous server's file hash.
+  const olderTags = floorSpace.station.tags.map((tag, i) => ({ ...tag, surface: floorLayout.tags[i].surface }));
+  const legacyFile = JSON.stringify({ ...floorSpace.station, tags: olderTags }, null, 2) + '\n';
+  await writeFile(join(dir, 'spaces', floorSpace.id + '.json'), legacyFile);
+  const reloaded = await fetch(floorUrl, { headers: { 'If-None-Match': etag(legacyFile) } });
+  assert.equal(reloaded.status, 200);
+  assert.deepEqual((await reloaded.json()).tags, expectedTags);
+  assert.equal(reloaded.headers.get('etag'), postedFloor.headers.get('etag'), 'same visible layout has the same revision');
+  assert.notEqual(reloaded.headers.get('etag'), etag(legacyFile));
+  const trackingLayouts = await (await fetch(base + '/layouts')).json();
+  assert.deepEqual(trackingLayouts.find(layout => layout.id === floorSpace.id).station.tags, expectedTags);
 });

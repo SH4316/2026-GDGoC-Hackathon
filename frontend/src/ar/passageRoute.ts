@@ -54,4 +54,4 @@ export function distanceAlong(route: PassageRoute, point: Point): number | undef
   if (nearest <= 1.5 && !candidates.some(c => c.gap <= nearest + .15 && Math.abs(c.along - progress) > 2)) return progress;
 }
 
-export const passageMeters = (meters: number) => Number(meters.toFixed(1)).toLocaleString('ko-KR') + ' m';
+export const passageMeters = (meters: number, locale = 'ko-KR') => Number(meters.toFixed(1)).toLocaleString(locale) + ' m';

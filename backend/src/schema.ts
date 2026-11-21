@@ -40,6 +40,8 @@ const railStop = z.object({
 export type RailStop = z.infer<typeof railStop>;
 const stationLink = railStop.extend({ routeEndpoint: z.enum(['start', 'end']).optional() });
 const stationSnapshot = z.object({
+  autoRoute: z.union([z.literal(false), z.object({ startTag: tagId.optional(), endTag: tagId.optional() })])
+    .nullish().transform(settings => settings ?? undefined),
   stationLinks: z.array(stationLink)
     .refine(stops => new Set(stops.map(s => JSON.stringify([s.line, s.code]))).size === stops.length,
       '같은 역과 노선을 두 번 연결할 수 없습니다.')
@@ -60,6 +62,12 @@ export const stationSchema = stationSnapshot
   .refine(s => new Set(s.tags.map(t => t.id)).size === s.tags.length, '태그 ID가 중복되었습니다.')
   .superRefine((s, ctx) => {
     const graph = s.tagGraph;
+    if (s.autoRoute) {
+      const { startTag, endTag } = s.autoRoute;
+      if (graph || [startTag, endTag].some(id => id !== undefined && !s.tags.some(t => t.id === id)) ||
+          (startTag !== undefined && startTag === endTag))
+        ctx.addIssue({ code: 'custom', path: ['autoRoute'], message: '자동 경로에는 이 공간의 서로 다른 출발·도착 태그를 지정하세요.' });
+    }
     if (!graph) return;
     const points = new Map(s.tags.map(t => [t.id, t.walkPoint ?? t.center]));
     const issue = (message: string) => ctx.addIssue({ code: 'custom', path: ['tagGraph'], message });
@@ -83,7 +91,18 @@ export const stationSchema = stationSnapshot
   .refine(s => s.route.slice(1).every(([x,y], i) => Math.hypot(x-s.route[i][0], y-s.route[i][1]) >= 0.05),
     '인접한 경로점은 5 cm 이상 떨어져야 합니다.')
   .refine(s => s.camera.calibration || (s.camera.diagonalFovDeg! > 15 && s.camera.diagonalFovDeg! < 150),
-    '보정값 또는 15°와 150° 사이의 대각 화각이 필요합니다.');
+    '보정값 또는 15°와 150° 사이의 대각 화각이 필요합니다.')
+  .transform(station => {
+    for (const { surface } of station.tags) {
+      if (!surface || Math.abs(surface.heightM) >= 1e-6) continue;
+      const { right, up } = surface;
+      // Older 3D placements could select the underside of the station's z=0 floor.
+      // Keep the saved up axis and the clockwise yaw shown on the floor plan.
+      const normalZ = right[0] * up[1] - right[1] * up[0];
+      if (normalZ < -.9999) surface.right = [-right[0], -right[1], -right[2]];
+    }
+    return station;
+  });
 export type Station = z.infer<typeof stationSchema>;
 export const sessionSchema = z.object({
   startedAtMs: positive,

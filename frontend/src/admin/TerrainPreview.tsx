@@ -1,3 +1,4 @@
+import { useLanguage } from '../i18n/LanguageSelect';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   AmbientLight, Box3, BufferGeometry, Color, DirectionalLight, Group, Line, LineBasicMaterial,
@@ -16,6 +17,7 @@ export default function TerrainPreview({ file, upload, route, tags, sideM, panOn
   panOnDrag: boolean; armed: boolean; selected: number | null;
   onPlace: (center: Point, surface: TagSurface) => void; onSelect: (index: number) => void;
 }) {
+  const { t } = useLanguage();
   const host = useRef<HTMLDivElement>(null);
   const surface = useRef<HTMLCanvasElement>(null);
   const orbit = useRef<OrbitControls | null>(null);
@@ -107,6 +109,8 @@ export default function TerrainPreview({ file, upload, route, tags, sideM, panOn
       if (normal.dot(ray.ray.direction) > 0) normal.negate();
       // OBJ is Y-up. Store the frame in station coordinates (+Z up).
       normal.set(normal.x, -normal.z, normal.y);
+      // A marker on the station floor faces the walker even when placed from below the mesh.
+      if (Math.abs(hit.point.y) < 1e-6 && normal.z < -.9999) normal.negate();
       const reference = Math.abs(normal.z) < .7 ? new Vector3(0, 0, 1) : new Vector3(0, 1, 0);
       const right = reference.cross(normal).normalize();
       const up = new Vector3().crossVectors(normal, right).normalize();
@@ -242,9 +246,9 @@ export default function TerrainPreview({ file, upload, route, tags, sideM, panOn
   }, [route, tags, file, upload, selected, sideM]);
 
   return <div className="model-stage" ref={host} data-placing={armed} data-pan={panOnDrag}>
-    <canvas ref={surface} tabIndex={0} role="img" aria-label="공간 3D 모델과 AprilTag" aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight" />
+    <canvas ref={surface} tabIndex={0} role="img" aria-label={t('공간 3D 모델과 AprilTag')} aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight" />
     {!notice && <TagMarkers {...projection} selected={selected} select={onSelect} placing={armed} model />}
-    {armed && missed && !notice && <p role="status">모델의 면을 다시 눌러 주세요.</p>}
-    {notice && <p role="status">{notice}</p>}
+    {armed && missed && !notice && <p role="status">{t('모델의 면을 다시 눌러 주세요.')}</p>}
+    {notice && <p role="status">{t(notice)}</p>}
   </div>;
 }

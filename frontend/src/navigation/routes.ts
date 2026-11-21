@@ -105,8 +105,8 @@ export function displayPlaceName(name: string) {
   return station[1] + ' · ' + line.replace(/^수도권\s*(?=\d+호선)/, '');
 }
 
-export function formatMeters(meters: number) {
-  return meters < 1000 ? Math.round(meters) + ' m' : (meters / 1000).toLocaleString('ko-KR', { maximumFractionDigits: 1 }) + ' km';
+export function formatMeters(meters: number, locale = 'ko-KR') {
+  return meters < 1000 ? Math.round(meters) + ' m' : (meters / 1000).toLocaleString(locale, { maximumFractionDigits: 1 }) + ' km';
 }
 
 const gpsOptions = { enableHighAccuracy: true, maximumAge: 10_000, timeout: 12_000 };

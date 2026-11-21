@@ -8,11 +8,12 @@ import { DirectionsService } from './directions/service.js';
 import { DirectionsController } from './directions.controller.js';
 import { RecordingsController } from './recordings.controller.js';
 import { RecordingStore } from './store.js';
+import { ScreenDoorsController } from './screen-doors.controller.js';
 import { SignsController } from './signs.controller.js';
 import { StationController } from './station.controller.js';
 import { StationStore } from './station.store.js';
 
-@Module({ controllers: [AssistantController, DirectionsController, RecordingsController, SignsController, StationController], providers: [DirectionsService, RecordingStore, StationStore] })
+@Module({ controllers: [AssistantController, DirectionsController, RecordingsController, ScreenDoorsController, SignsController, StationController], providers: [DirectionsService, RecordingStore, StationStore] })
 class AppModule {}
 
 const envFile = new URL('../../.env', import.meta.url);

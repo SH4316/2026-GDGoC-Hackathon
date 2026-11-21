@@ -1,3 +1,4 @@
+import { useLanguage } from '../i18n/LanguageSelect';
 import type { CSSProperties } from 'react';
 
 export type TagPoint = { index: number; id: string; x: number; y: number; yaw?: number };
@@ -30,12 +31,13 @@ export function TagMarkers({ points, width, height, selected, select, placing = 
   points: TagPoint[]; width: number; height: number; selected: number | null; select: (index: number) => void;
   placing?: boolean; model?: boolean; reserved?: Rect[];
 }) {
+  const { t } = useLanguage();
   const labels = placeLabels(points, selected, width, height, reserved);
   return <div className="tag-markers" data-placing={placing}>
     {points.map(point => {
       const label = labels.get(point.index)!;
       return <button type="button" key={point.index} className="tag-point" data-tag-index={point.index}
-        data-side={label.side} data-label={label.visible} aria-label={'태그 ' + (point.id || '새 태그') + ' 위치'}
+        data-side={label.side} data-label={label.visible} aria-label={t('태그 {id} 위치', { id: point.id || t('새 태그') })}
         aria-pressed={selected === point.index} disabled={placing}
         style={{ left: point.x, top: point.y, '--yaw': (point.yaw ?? 0) + 'deg' } as CSSProperties}
         onClick={event => {
@@ -43,7 +45,7 @@ export function TagMarkers({ points, width, height, selected, select, placing = 
           if (!model || event.detail === 0) select(point.index);
         }}>
         <span className="tag-anchor" data-oriented={point.yaw !== undefined} aria-hidden="true" />
-        <span className="tag-number">{point.id || '새 태그'}</span>
+        <span className="tag-number">{point.id || t('새 태그')}</span>
       </button>;
     })}
   </div>;

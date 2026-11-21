@@ -6,8 +6,9 @@ function tagLinks(station: Station, tagId: number): StationLink[] {
   const links = station.stationLinks ?? [];
   if (!tag || links.length < 2) return tag ? links : [];
   const endpoints = links.filter(link => {
-    if (station.tagGraph) return link.routeEndpoint === 'start' ? tag.id === station.tagGraph.startTag
-      : link.routeEndpoint === 'end' && tag.id === station.tagGraph.endTag;
+    const graph = station.tagGraph || station.autoRoute;
+    if (graph) return link.routeEndpoint === 'start' ? tag.id === graph.startTag
+      : link.routeEndpoint === 'end' && tag.id === graph.endTag;
     const point = link.routeEndpoint === 'start' ? station.route[0]
       : link.routeEndpoint === 'end' ? station.route.at(-1) : undefined;
     return point && Math.hypot(point[0] - tag.center[0], point[1] - tag.center[1]) <= 1;
@@ -52,6 +53,20 @@ function transfersAtStation(trip: Journey, station: Station) {
   return transfers;
 }
 
+// Automatic tag passages are bidirectional. Orient all consumers (route tree,
+// minimap, spoken line name and boarding confirmation) for this itinerary.
+export function orientTransferLayout(trip: Journey, layout: SpaceLayout, step: number): SpaceLayout {
+  const { station, network } = layout;
+  if (!station.autoRoute || !station.stationLinks?.some(link => link.routeEndpoint === 'end')) return layout;
+  const reversed: Station = { ...station, route: [...station.route].reverse(),
+    autoRoute: { startTag: station.autoRoute.endTag, endTag: station.autoRoute.startTag },
+    stationLinks: station.stationLinks.map(link => ({ ...link,
+      routeEndpoint: link.routeEndpoint === 'start' ? 'end' : link.routeEndpoint === 'end' ? 'start' : undefined })) };
+  const nextBoarding = (s: Station) => transfersAtStation(trip, s).find(t => t.boardingStep >= step)?.boardingStep ?? Infinity;
+  if (nextBoarding(reversed) >= nextBoarding(station)) return layout;
+  return { ...layout, station: reversed, network: network && { ...network, start: network.end, end: network.start } };
+}
+
 export function routeTransfers(trip: Journey, layouts: SpaceLayout[]): RouteTransfer[] {
   const byBoarding = new Map<number, RouteTransfer>();
   for (const layout of layouts) {
@@ -63,10 +78,39 @@ export function routeTransfers(trip: Journey, layouts: SpaceLayout[]): RouteTran
   return [...byBoarding.values()].sort((a, b) => a.boardingStep - b.boardingStep);
 }
 
+// GPS can reach the boarding leg before the traveller reaches its platform.
+export function awaitingBoarding(current: JourneyProgress, boardingStep: number) {
+  return current.step < boardingStep || (current.step === boardingStep && (current.stopIndex ?? -1) < 0);
+}
+
+export function upcomingIndoorTransfer(trip: Journey, current: JourneyProgress, station: Station, inTransferView = false) {
+  if (station.stationLinks?.some(link => isStationPlace(trip.destination.name, link))) return;
+  const transfer = transfersAtStation(trip, station).find(t => t.boardingStep >= current.step);
+  if (!transfer) return;
+  if (awaitingBoarding(current, transfer.boardingStep)) return transfer;
+  // The saved AR screen can still be checking the screen door after arrival.
+  if (inTransferView && current.stopIndex === 0 && stopName(current.station ?? '') === stopName(transfer.station)) return transfer;
+}
+
+export type BoardingTarget = { station?: string; line?: string; toward?: string };
+
+export function boardingTarget(station: Station, trip: Journey | undefined, step: number, targetTag?: number): BoardingTarget {
+  // The arrival callback may already have advanced progress to the boarding step.
+  const transfer = trip && transfersAtStation(trip, station).find(t => t.boardingStep >= step);
+  if (trip && transfer) {
+    const stops = trip.steps[transfer.boardingStep].rail!.stops;
+    const toward = stops.slice(1).map(s => s.name.trim()).find(name => name && stopName(name) !== stopName(transfer.station));
+    return { station: transfer.station, line: transfer.toLine, toward };
+  }
+  const links = targetTag === undefined ? station.stationLinks ?? [] : tagLinks(station, targetTag);
+  const endpoint = links.length === 1 ? links[0] : targetTag === undefined && links.find(l => l.routeEndpoint === 'end');
+  return endpoint ? { station: endpoint.name, line: endpoint.line } : {};
+}
+
 export function progressAtIndoorArrival(trip: Journey, current: JourneyProgress, layout: SpaceLayout, time: number): JourneyProgress {
   if (current.tagTime !== undefined && time < current.tagTime) return current;
-  const transfer = transfersAtStation(trip, layout.station).find(candidate => candidate.boardingStep >= current.step);
-  if (!transfer || (transfer.boardingStep === current.step && (current.stopIndex ?? -1) >= 0)) return current;
+  const transfer = upcomingIndoorTransfer(trip, current, layout.station);
+  if (!transfer) return current;
   return { step: transfer.boardingStep, stopIndex: 0, station: transfer.station, position: transfer.point, tagTime: time };
 }
 
@@ -92,11 +136,12 @@ export function progressAtTag(trip: Journey, current: JourneyProgress, station: 
   // the corridor's endpoint confirms that the traveller reached the boarding platform.
   const transfer = transfersAtStation(trip, station).find(candidate => candidate.boardingStep >= current.step);
   if (transfer) {
+    if (!awaitingBoarding(current, transfer.boardingStep)) return current;
     const incoming = trip.steps[transfer.transferStep - 1];
     const hasWalk = transfer.transferStep < transfer.boardingStep;
-    const step = hasWalk ? transfer.transferStep : transfer.transferStep - 1;
-    const stopIndex = hasWalk ? -1 : incoming.rail!.stops.length - 1;
-    if (current.step > step || (current.step === step && current.station === transfer.station && current.stopIndex === stopIndex)) return current;
+    const step = Math.max(current.step, hasWalk ? transfer.transferStep : transfer.transferStep - 1);
+    const stopIndex = step < transfer.transferStep ? incoming.rail!.stops.length - 1 : -1;
+    if (current.step === step && current.station === transfer.station && current.stopIndex === stopIndex) return current;
     return { step, stopIndex, station: transfer.station,
       position: incoming.rail?.stops.at(-1)?.point ?? incoming.points.at(-1), tagTime: time };
   }

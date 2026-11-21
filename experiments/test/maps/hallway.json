@@ -1,0 +1,42 @@
+{
+  "id": "hallway",
+  "name": { "ko": "복도 시연용 (T자)", "en": "Hallway demo (T shape)" },
+  "markerSize": 0.16,
+
+  "nodes": {
+    "s": [0, 0],
+    "m": [0, 5],
+    "j": [0, 10],
+    "l": [-6, 10],
+    "r": [6, 10]
+  },
+
+  "edges": [["s", "m"], ["m", "j"], ["j", "l"], ["j", "r"]],
+
+  "markers": [
+    { "id": "F1", "mount": "floor", "x": 0, "y": 1.5, "facing": 0 },
+    { "id": "W1", "mount": "wall", "x": -1, "y": 5, "h": 1.5, "facing": 90 },
+    { "id": "F2", "mount": "floor", "x": 0, "y": 10, "facing": 0 },
+    { "id": "W2", "mount": "wall", "x": 0, "y": 11, "h": 1.5, "facing": 180 }
+  ],
+
+  "pois": [
+    { "id": "exit1", "type": "exit", "number": 1, "node": "s" },
+    { "id": "toilet", "type": "toilet", "node": "l" },
+    {
+      "id": "line2",
+      "type": "platform",
+      "node": "r",
+      "name": { "ko": "2호선 승강장", "en": "Line 2 platform", "ja": "2号線ホーム", "zh": "2号线站台" },
+      "keywords": ["2호선", "line 2", "지하철", "subway", "train", "2号线", "2号線", "地铁", "地下鉄"]
+    }
+  ],
+
+  "walls": [
+    [-1, -1, -1, 9], [1, -1, 1, 9], [-1, -1, 1, -1],
+    [-7, 11, 7, 11], [-7, 9, -1, 9], [1, 9, 7, 9],
+    [-7, 9, -7, 11], [7, 9, 7, 11]
+  ],
+
+  "start": { "x": 0, "y": 0.2, "heading": 0, "pitch": -40 }
+}
